@@ -1,0 +1,5 @@
+Copy this into your GitHub repo → Settings → General → Description:
+
+  Desktop widget for Razer wireless device battery levels (headphones, keyboard, mouse). Windows 10/11. Requires Razer Synapse.
+
+Suggested topics (Settings → General → Topics): razer, battery, electron, windows, synapse, widget

@@ -1,103 +1,107 @@
 # Razer Battery Widget
 
-A small desktop widget that shows battery level for your Razer wireless gear (headphones, keyboard, mouse) with circular indicators and a charging (lightning) icon when applicable. Styled with Razer’s dark theme and green accents.
+A lightweight Windows desktop widget that shows battery level and charging status for your Razer wireless devices—headphones, keyboard, and mouse—in one place. Styled with Razer’s dark theme and green accents.
+
+---
 
 ## Download
 
-**[→ Latest release (installer)](https://github.com/YOUR_USERNAME/razer-battery-widget/releases/latest)** — Download the `.exe` installer, run it, and you’re done. Requires [Razer Synapse 3](https://www.razer.com/synapse-3) or [Razer Synapse 4](https://www.razer.com/synapse) to be running.
+**[Download the latest release (Windows installer)](https://github.com/LeonardoVidolin/razer-battery-widget/releases/latest)**
 
-*(Replace `YOUR_USERNAME` with your GitHub username after you create the repo and your first release.)*
+1. Download **Razer Battery Widget Setup x.x.x.exe**
+2. Run the installer
+3. Launch the app—the widget appears on your desktop and an icon sits in the system tray
 
-## How it works
+**Requirement:** [Razer Synapse 3](https://www.razer.com/synapse-3) or [Razer Synapse 4](https://www.razer.com/synapse) must be running. The widget reads battery data from Synapse’s logs—no extra drivers or USB access needed.
 
-Like [razer-taskbar](https://github.com/sanraith/razer-taskbar), this app reads battery data from **Razer Synapse** log files—no USB or driver needed. You must have **Razer Synapse 3** or **Razer Synapse 4** running.
+---
 
-- **Synapse 3:** `%LOCALAPPDATA%\Razer\Synapse3\Log\Razer Synapse 3.log`
-- **Synapse 4:** `%LOCALAPPDATA%\Razer\RazerAppEngine\User Data\Logs\systray_systrayv2*.log`
+## Features
+
+- **Three device slots** — Headphones, keyboard, and mouse with clear icons and circular battery indicators
+- **Charging indicator** — Lightning icon when a device is charging
+- **Razer-style UI** — Dark background, green accents, always-on-top option
+- **System tray** — Minimize to the tray; double-click or use the menu to show the widget again
+- **Start with Windows** — Optional launch at login (toggle in the tray menu)
+- **Always on top** — Optional toggle so the widget stays above other windows
+
+---
 
 ## Requirements
 
-- Windows (tested on 10 & 11)
-- Razer Synapse 3 or 4 running in the background
-- Node.js (for running from source or building the .exe)
+- **Windows** 10 or 11
+- **Razer Synapse 3** or **Razer Synapse 4** (running in the background)
+- No admin rights or extra drivers required
 
-## Run from source
+---
+
+## Usage
+
+- **Move the widget** — Drag it by the background
+- **Minimize** — Close the window; the app stays in the system tray
+- **Show again** — Double-click the tray icon or right-click → **Show Widget**
+- **Tray menu** — Right-click the tray icon for **Start with Windows**, **Always on top**, and **Quit**
+
+---
+
+## Supported devices
+
+Devices are detected automatically from Synapse. Typical matches:
+
+| Slot       | Examples                                                                 |
+| ---------- | ------------------------------------------------------------------------ |
+| Headphones | BlackShark, Kraken, Barracuda, Nari, Thresher, and other headsets        |
+| Keyboard   | BlackWidow, Huntsman, Ornata, Cynosa, DeathStalker                        |
+| Mouse      | DeathAdder, Viper, Basilisk, Mamba, Naga, Orochi, Cobra, Pro Click       |
+
+If a device doesn’t appear, it may use a name that isn’t mapped yet; the widget still shows up to three devices, filling slots in order when the exact type isn’t recognized.
+
+---
+
+## For developers
+
+### Run from source
 
 ```bash
+git clone https://github.com/LeonardoVidolin/razer-battery-widget.git
+cd razer-battery-widget
 npm install
 npm start
 ```
 
-The widget appears as a floating window. Drag the background to move it. Close the window to minimize to the system tray; double‑click the tray icon or use **Show Widget** in the tray menu to open it again.
-
-## Start with Windows
-
-- Right‑click the tray icon → **Start with Windows** (checked by default).
-- When enabled, the widget will start automatically when you log in.
-
-## Build an installer (.exe)
+### Build the installer
 
 ```bash
-npm install
 npm run build
 ```
 
-The installer is created in the `dist/` folder. Run it to install Razer Battery Widget; you can choose the install location and create a desktop shortcut. After installation, enable **Start with Windows** in the tray menu if you want it to launch at login.
+The installer is created in the `dist/` folder.
 
-## Device mapping
+### How it works
 
-Devices are matched to slots by name. If a device isn’t recognized, it is still shown in the first available slot (headphones, then keyboard, then mouse).
+Battery data is read from Razer Synapse log files (same approach as [razer-taskbar](https://github.com/sanraith/razer-taskbar)):
 
-- **Headphones:** headset, headphone, BlackShark, Kraken, Barracuda, Nari, etc.
-- **Keyboard:** keyboard, BlackWidow, Huntsman, Ornata, Cynosa, etc.
-- **Mouse:** mouse, DeathAdder, Viper, Basilisk, Mamba, Naga, Orochi, Cobra, Pro Click, etc.
+- **Synapse 3:** `%LOCALAPPDATA%\Razer\Synapse3\Log\Razer Synapse 3.log`
+- **Synapse 4:** `%LOCALAPPDATA%\Razer\RazerAppEngine\User Data\Logs\systray_systrayv2*.log`
 
-You can extend the keywords in `renderer.js` if needed.
+Device names and keywords can be extended in `renderer.js` to support more products.
 
-## Tray icon
-
-The system tray uses `assets/tray-icon.png` (a 32×32 Razer-green battery icon). To regenerate it:
+### Regenerate tray icon
 
 ```bash
 npm run tray-icon
 ```
 
-## Publishing on GitHub
+---
 
-### 1. Create the repository and push
+## License
 
-1. On GitHub, click **New repository**. Name it (e.g. `razer-battery-widget`). Do **not** add a README, .gitignore, or license.
-2. In your project folder, run (replace `YOUR_USERNAME` with your GitHub username):
+MIT — see [LICENSE](LICENSE).
 
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit: Razer Battery Widget"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/razer-battery-widget.git
-   git push -u origin main
-   ```
+---
 
-### 2. Optional: repo description and topics
+---
 
-In the repo **Settings → General**, set a short description and topics (e.g. `razer`, `battery`, `electron`, `windows`, `synapse`).
+**Maintainer:** Release checklist and Git setup are in the [docs/](docs/) folder.
 
-### 3. Publish a release (so others can download the installer)
-
-1. **Build the installer:**
-
-   ```bash
-   npm run build
-   ```
-
-2. **Create a release on GitHub:**
-   - Open your repo → **Releases** → **Create a new release**.
-   - **Choose a tag:** e.g. `v1.0.0` (create new tag).
-   - **Release title:** e.g. `v1.0.0`.
-   - **Description:** e.g. “First release. Windows installer for Razer Battery Widget.”
-   - **Attach the installer:** drag and drop the file from `dist/` — it’s named like **Razer Battery Widget Setup 1.0.0.exe**.
-   - Click **Publish release**.
-
-3. **Update the Download link** in this README: replace `YOUR_USERNAME` in the “Latest release” link with your GitHub username so the link points to your repo.
-
-After that, the **Download** section at the top will point to your latest release and users can get the installer from there.
+*Not affiliated with Razer Inc. Razer and Synapse are trademarks of Razer Inc.*

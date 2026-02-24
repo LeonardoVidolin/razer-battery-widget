@@ -16,13 +16,13 @@
     "widget",
     "synapse"
   ],
-  "author": "",
+  "author": "LeonardoVidolin",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/razer-battery-widget.git"
+    "url": "https://github.com/LeonardoVidolin/razer-battery-widget.git"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/razer-battery-widget#readme",
+  "homepage": "https://github.com/LeonardoVidolin/razer-battery-widget#readme",
   "devDependencies": {
     "electron": "^40.6.0",
     "electron-builder": "^25.1.8"

@@ -46,7 +46,7 @@ git config --global init.defaultBranch main
 
 Run these from the **project folder** (e.g. `d:\Cursos\Battery_widget`).
 
-**Replace `YOUR_USERNAME`** with your GitHub username. Create the repo on GitHub first (New repository, name it e.g. `razer-battery-widget`, leave README/.gitignore/license unchecked).
+Create the repo on GitHub first (New repository, name it e.g. `razer-battery-widget`, leave README/.gitignore/license unchecked).
 
 ```bat
 cd /d d:\Cursos\Battery_widget
@@ -56,18 +56,18 @@ git add .
 git status
 git commit -m "Initial commit: Razer Battery Widget"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/razer-battery-widget.git
+git remote add origin https://github.com/LeonardoVidolin/razer-battery-widget.git
 git push -u origin main
 ```
 
-- **`git status`** — Shows what will be committed. You should see no `node_modules` or `dist` (they’re in `.gitignore`).
+- **`git status`** — Shows what will be committed. You should see no `node_modules` or `dist` (they're in `.gitignore`).
 - **GitHub login:** On first `git push`, Windows may open a browser or ask for credentials. Sign in with your GitHub account. If it asks for a password, use a **Personal Access Token** (GitHub → Settings → Developer settings → Personal access tokens → Generate new token).
 
 ---
 
 ## 5. After the first push
 
-- Edit **README.md** and **package.json**: replace `YOUR_USERNAME` with your real GitHub username so the “Download” and repo links work.
+- README and package.json are already set for **LeonardoVidolin/razer-battery-widget**.
 - Create a **Release** on GitHub and upload the installer from `dist\` so people can download it.
 
 ---
