@@ -1,0 +1,62 @@
+{
+  "name": "razer-battery-widget",
+  "version": "1.0.0",
+  "description": "Desktop widget showing battery for Razer wireless gear (headphones, keyboard, mouse)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
+    "dist": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never",
+    "tray-icon": "node scripts/create-tray-icon.js",
+    "prepare": "node scripts/create-tray-icon.js"
+  },
+  "keywords": [
+    "razer",
+    "battery",
+    "widget",
+    "synapse"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/razer-battery-widget.git"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/razer-battery-widget#readme",
+  "devDependencies": {
+    "electron": "^40.6.0",
+    "electron-builder": "^25.1.8"
+  },
+  "overrides": {
+    "glob": "^11.0.0",
+    "tar": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.razer.batterywidget",
+    "productName": "Razer Battery Widget",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "styles.css",
+      "renderer.js",
+      "watcher/**",
+      "assets/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
+    }
+  }
+}
