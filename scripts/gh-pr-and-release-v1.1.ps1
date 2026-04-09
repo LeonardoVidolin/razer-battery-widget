@@ -24,7 +24,7 @@ if (-not (git tag -l 'v1.1.0')) {
   Write-Host '>> tag v1.1.0 já existe; não recriei.'
 }
 
-Write-Host '>> gh release create v1.1.0'
-gh release create v1.1.0 $setup --title 'Razer Battery Widget v1.1.0' --notes-file $notesFile
+Write-Host '>> gh release create v1.1.0 (usa a tag v1.1.0 já existente no remoto)'
+gh release create v1.1.0 $setup --title 'Razer Battery Widget v1.1.0' --notes-file $notesFile --verify-tag
 
 Write-Host 'Concluído.'
