@@ -2,7 +2,7 @@
 
 A lightweight Windows desktop widget that shows battery level and charging status for your Razer wireless devices—headphones, keyboard, and mouse—in one place. Styled with Razer’s dark theme and green accents.
 
-<img width="449" height="164" alt="image" src="https://github.com/user-attachments/assets/0427ea9e-8da8-4864-ae5f-ed89ac90785e" />
+<img width="439" height="265" alt="image" src="https://github.com/user-attachments/assets/eb03ec38-da64-43fe-8d12-d8c1872e3a83" />
 
 
 ---
