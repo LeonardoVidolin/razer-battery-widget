@@ -44,7 +44,11 @@
       "styles.css",
       "renderer.js",
       "watcher/**",
-      "assets/**"
+      "assets/**",
+      "lib/**"
+    ],
+    "asarUnpack": [
+      "lib/windows-audio-levels.ps1"
     ],
     "win": {
       "target": [
