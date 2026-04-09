@@ -1,0 +1,27 @@
+=== Razer Battery Widget — forum post (copy & paste) ===
+
+Title suggestion: "Razer Battery Widget – see headset, keyboard & mouse battery in one place"
+
+---
+
+Hi,
+
+I made a small desktop widget for Windows that shows battery level (and charging status) for your Razer wireless gear in one place: headphones, keyboard, and mouse. It uses the same idea as razer-taskbar (reads Synapse logs), so you need Razer Synapse 3 or 4 running—no extra drivers.
+
+• Download (installer): https://github.com/LeonardoVidolin/razer-battery-widget/releases/latest
+• Source & readme: https://github.com/LeonardoVidolin/razer-battery-widget
+
+It sits on the desktop with a Razer-style dark/green look, minimizes to the tray, and you can enable “Start with Windows” from the tray menu. Works on Windows 10 and 11.
+
+If you try it and something doesn’t work or a device isn’t detected, say which one and I can try to add support.
+
+---
+
+=== Short version (e.g. for a reply or smaller forum) ===
+
+Razer Battery Widget – desktop widget that shows battery % for your Razer wireless headset, keyboard, and mouse. Requires Synapse 3 or 4.
+
+Download: https://github.com/LeonardoVidolin/razer-battery-widget/releases/latest  
+Repo: https://github.com/LeonardoVidolin/razer-battery-widget
+
+Windows 10/11. Free, open source (MIT).

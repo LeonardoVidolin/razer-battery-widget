@@ -1,6 +1,6 @@
 {
   "name": "razer-battery-widget",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop widget showing battery for Razer wireless gear (headphones, keyboard, mouse)",
   "main": "main.js",
   "scripts": {
@@ -44,7 +44,11 @@
       "styles.css",
       "renderer.js",
       "watcher/**",
-      "assets/**"
+      "assets/**",
+      "lib/**"
+    ],
+    "asarUnpack": [
+      "lib/windows-audio-levels.ps1"
     ],
     "win": {
       "target": [
