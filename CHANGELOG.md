@@ -2,22 +2,22 @@
 
 ## [1.1.0] — 2026-04-09
 
-### Adicionado
+### Added
 
-- Controles de **volume de saída (fone)** e **microfone** no Windows (PowerShell + Core Audio), com arraste e teclado.
-- Opção **Always on top** na bandeja, com níveis de Z-order no Windows e reaplicação periódica.
-- Poll de bateria no processo principal + envio centralizado ao renderer para atualização mais confiável.
+- **Windows audio:** output (headphones) and microphone level sliders (PowerShell + Core Audio), with mouse drag and keyboard adjustment.
+- **Always on top** tray option, with Windows Z-order levels and periodic re-application.
+- Main-process battery polling and centralized push to the renderer for more reliable updates.
 
-### Corrigido / melhorado
+### Fixed / improved
 
-- **Synapse 4:** leitura de `level` numérico ou string; descoberta de log `systray_systrayv*.log` alinhada; mantém última bateria válida quando o campo some no JSON.
-- **Synapse 3:** segundo padrão de regex para `_OnBatteryLevelChanged` (ex.: headset wireless); reduz **0%** espúrio quando o último evento no log contradiz o anterior.
-- **UI:** ao haver entradas duplicadas do mesmo modelo, prioriza a leitura de bateria mais plausível (nome / tipo).
+- **Synapse 4:** battery `level` read as number or string; systray log discovery aligned; keeps last valid battery when the field is missing from JSON.
+- **Synapse 3:** alternate regex for `_OnBatteryLevelChanged` (e.g. wireless headsets); reduces spurious **0%** when the latest log line contradicts the previous one.
+- **UI:** when duplicate entries exist for the same model, prefers the more plausible battery reading (by name / type).
 
 ### Build
 
-- Instalador NSIS: `npm run dist` → `dist/Razer Battery Widget Setup 1.1.0.exe`.
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.1.0.exe`.
 
-## [1.0.0] — anterior
+## [1.0.0] — earlier
 
-- Versão inicial publicada no repositório.
+- Initial version published in this repository.

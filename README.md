@@ -24,9 +24,10 @@ A lightweight Windows desktop widget that shows battery level and charging statu
 - **Three device slots** — Headphones, keyboard, and mouse with clear icons and circular battery indicators
 - **Charging indicator** — Lightning icon when a device is charging
 - **Razer-style UI** — Dark background, green accents
+- **Volume** — Adjust Windows output (headphones) and microphone levels from the widget (Windows only)
 - **System tray** — Minimize to the tray; double-click or use the menu to show the widget again
 - **Start with Windows** — Optional launch at login (toggle in the tray menu)
-- **Battery refresh** — Synapse logs are re-read about every 45 seconds (plus a few quick reads at startup so devices show up sooner)
+- **Battery refresh** — Synapse logs are polled about every 30 seconds from the main process, with extra reads at startup so devices show up sooner
 
 ---
 
@@ -43,7 +44,7 @@ A lightweight Windows desktop widget that shows battery level and charging statu
 - **Move the widget** — Drag it by the background
 - **Minimize** — Close the window; the app stays in the system tray
 - **Show again** — Double-click the tray icon or right-click → **Show Widget**
-- **Tray menu** — Right-click the tray icon for **Start with Windows** and **Quit**
+- **Tray menu** — Right-click the tray icon for **Always on top**, **Start with Windows**, and **Quit**
 
 ---
 
@@ -85,7 +86,7 @@ The installer is created in the `dist/` folder.
 Battery data is read from Razer Synapse log files (same approach as [razer-taskbar](https://github.com/sanraith/razer-taskbar)):
 
 - **Synapse 3:** `%LOCALAPPDATA%\Razer\Synapse3\Log\Razer Synapse 3.log`
-- **Synapse 4:** `%LOCALAPPDATA%\Razer\RazerAppEngine\User Data\Logs\systray_systrayv2*.log`
+- **Synapse 4:** `%LOCALAPPDATA%\Razer\RazerAppEngine\User Data\Logs\systray_systrayv*.log`
 
 Device names and keywords can be extended in `renderer.js` to support more products.
 
