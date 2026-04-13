@@ -106,8 +106,6 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
----
-
 **Maintainer:** Release checklist and Git setup are in the [docs/](docs/) folder.
 
 *Not affiliated with Razer Inc. Razer and Synapse are trademarks of Razer Inc.*
