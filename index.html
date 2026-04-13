@@ -8,9 +8,33 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="widget">
+  <div class="resize-grips" aria-hidden="true">
+    <div class="resize-grip resize-n" data-edge="n"></div>
+    <div class="resize-grip resize-ne" data-edge="ne"></div>
+    <div class="resize-grip resize-e" data-edge="e"></div>
+    <div class="resize-grip resize-se" data-edge="se"></div>
+    <div class="resize-grip resize-s" data-edge="s"></div>
+    <div class="resize-grip resize-sw" data-edge="sw"></div>
+    <div class="resize-grip resize-w" data-edge="w"></div>
+    <div class="resize-grip resize-nw" data-edge="nw"></div>
+  </div>
+  <div class="widget" id="widget-root">
     <button type="button" class="refresh-btn" id="refresh-btn" title="Refresh device status" aria-label="Refresh">↻</button>
     <div class="devices" id="devices"></div>
+    <div class="volume-split" role="separator">
+      <span class="volume-split-line" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="volume-panel-toggle"
+        id="volume-panel-toggle"
+        title="Hide volume controls"
+        aria-expanded="true"
+        aria-controls="volume-rows"
+      >
+        <span class="volume-panel-toggle-icon" aria-hidden="true">▴</span>
+      </button>
+      <span class="volume-split-line" aria-hidden="true"></span>
+    </div>
     <div class="volume-rows" id="volume-rows" aria-label="System volume levels"></div>
   </div>
   <script src="renderer.js"></script>

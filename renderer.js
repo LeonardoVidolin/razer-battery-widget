@@ -249,7 +249,76 @@
 
   setupVolumeSliderDrag();
 
+  function setupResizeGrips() {
+    if (!window.electronAPI || typeof window.electronAPI.startWindowResize !== 'function') return;
+    document.querySelectorAll('.resize-grip').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const edge = el.dataset.edge;
+        if (!edge) return;
+        window.electronAPI.startWindowResize(edge);
+        const onMove = (ev) => {
+          window.electronAPI.updateWindowResize(ev.screenX, ev.screenY);
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          window.removeEventListener('blur', onUp);
+          window.electronAPI.endWindowResize();
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('blur', onUp);
+      });
+    });
+  }
+
+  setupResizeGrips();
+
+  const widgetRoot = document.getElementById('widget-root');
+  const volumePanelToggle = document.getElementById('volume-panel-toggle');
+
+  function updateCompactLayout() {
+    if (!widgetRoot) return;
+    const compact = window.innerHeight <= 274 || window.innerWidth <= 328;
+    widgetRoot.classList.toggle('widget--compact', compact);
+  }
+
+  function applyVolumePanelVisible(visible) {
+    if (!widgetRoot || !volumePanelToggle) return;
+    widgetRoot.classList.toggle('widget--volume-collapsed', !visible);
+    volumePanelToggle.setAttribute('aria-expanded', String(visible));
+    volumePanelToggle.title = visible ? 'Hide volume controls' : 'Show volume controls';
+    const icon = volumePanelToggle.querySelector('.volume-panel-toggle-icon');
+    if (icon) icon.textContent = visible ? '▴' : '▾';
+    updateCompactLayout();
+  }
+
+  if (volumePanelToggle && window.electronAPI && typeof window.electronAPI.setVolumePanelVisible === 'function') {
+    volumePanelToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const currentlyVisible = !widgetRoot.classList.contains('widget--volume-collapsed');
+      const nextVisible = !currentlyVisible;
+      applyVolumePanelVisible(nextVisible);
+      window.electronAPI.setVolumePanelVisible(nextVisible);
+    });
+  }
+
+  window.addEventListener('resize', () => updateCompactLayout());
+
   if (window.electronAPI) {
+    if (typeof window.electronAPI.getSettings === 'function') {
+      window.electronAPI
+        .getSettings()
+        .then((s) => applyVolumePanelVisible(s && s.volumePanelVisible !== false))
+        .catch(() => applyVolumePanelVisible(true));
+    } else {
+      applyVolumePanelVisible(true);
+    }
+
     window.electronAPI.onDevicesUpdate(render);
     window.electronAPI.getDevices().then((list) => render(Array.isArray(list) ? list : [])).catch(() => render([]));
 
@@ -262,5 +331,7 @@
     setInterval(() => {
       window.electronAPI.getDevices().then((list) => render(Array.isArray(list) ? list : [])).catch(() => {});
     }, DEVICES_UI_FALLBACK_MS);
+
+    updateCompactLayout();
   }
 })();

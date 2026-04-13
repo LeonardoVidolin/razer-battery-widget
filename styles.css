@@ -4,19 +4,115 @@
   padding: 0;
 }
 
+html {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
 body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 6px;
   font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif;
   background: transparent;
   overflow: hidden;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   user-select: none;
+}
+
+/* Invisible edge/corner hit targets for frameless window resize (see renderer setupResizeGrips). */
+.resize-grips {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.resize-grip {
+  position: absolute;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.resize-n {
+  left: 10px;
+  right: 10px;
+  top: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-s {
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-w {
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-e {
+  top: 10px;
+  bottom: 10px;
+  right: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-nw {
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.resize-ne {
+  right: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.resize-sw {
+  left: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.resize-se {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
 }
 
 .widget {
   position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: linear-gradient(165deg, #0a0a0c 0%, #111114 50%, #0c0c0e 100%);
   border-radius: 16px;
   padding: 22px 28px 18px;
+  -webkit-app-region: drag;
   box-shadow:
     0 0 0 1px rgba(0, 255, 0, 0.08),
     0 8px 32px rgba(0, 0, 0, 0.6),
@@ -83,16 +179,21 @@ body {
 }
 
 .devices {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: clamp(12px, 4vw, 32px);
+  min-height: 0;
+  flex-shrink: 0;
 }
 
 .device {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 
@@ -189,14 +290,155 @@ body {
   color: rgba(0, 255, 0, 0.2);
 }
 
-.volume-rows {
-  margin-top: 18px;
-  padding-top: 14px;
+.volume-split {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid rgba(0, 255, 0, 0.1);
+  -webkit-app-region: no-drag;
+}
+
+.volume-split-line {
+  flex: 1;
+  min-width: 8px;
+  height: 1px;
+  background: rgba(0, 255, 0, 0.14);
+}
+
+.volume-panel-toggle {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(0, 255, 0, 0.35);
+  border-radius: 6px;
+  background: rgba(0, 255, 0, 0.1);
+  color: #00ff00;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+.volume-panel-toggle:hover {
+  background: rgba(0, 255, 0, 0.18);
+  border-color: rgba(0, 255, 0, 0.5);
+}
+
+.volume-panel-toggle:active {
+  transform: scale(0.94);
+}
+
+.volume-panel-toggle-icon {
+  font-size: 12px;
+  line-height: 1;
+  display: block;
+}
+
+.widget--volume-collapsed .volume-rows {
+  display: none;
+}
+
+.volume-rows {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
   -webkit-app-region: no-drag;
+  min-height: 0;
+}
+
+/* Small window: rings-only style (fits ~50% default size in a corner). */
+.widget--compact {
+  padding: 12px 14px 12px;
+  border-radius: 14px;
+}
+
+.widget--compact .refresh-btn {
+  top: 4px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+}
+
+.widget--compact .devices {
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.widget--compact .percentage,
+.widget--compact .placeholder {
+  display: none;
+}
+
+.widget--compact .device-slot,
+.widget--compact .device-slot svg.ring {
+  width: 54px;
+  height: 54px;
+}
+
+.widget--compact .device-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.widget--compact .charging {
+  width: 14px;
+  height: 14px;
+  top: -2px;
+  right: -2px;
+}
+
+.widget--compact .volume-split {
+  margin-top: 8px;
+  padding-top: 6px;
+}
+
+.widget--compact .volume-panel-toggle {
+  width: 26px;
+  height: 20px;
+}
+
+.widget--compact .volume-row-title {
+  display: none;
+}
+
+.widget--compact .volume-row {
+  gap: 6px;
+}
+
+.widget--compact .volume-row-body {
+  margin-top: 0;
+}
+
+.widget--compact .volume-track {
+  height: 14px;
+}
+
+.widget--compact .volume-pct {
+  flex: 0 0 30px;
+  font-size: 10px;
+}
+
+.widget--compact .volume-row-label svg {
+  width: 14px;
+  height: 14px;
+}
+
+.widget--compact .volume-rows {
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .volume-row {

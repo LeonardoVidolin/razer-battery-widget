@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-new/
+dist-build/
 *.log
 .DS_Store
 .electron-userdata/

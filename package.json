@@ -7,6 +7,7 @@
     "start": "electron .",
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
     "dist": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never",
+    "dist:fresh": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never -c.directories.output=dist-new",
     "tray-icon": "node scripts/create-tray-icon.js",
     "prepare": "node scripts/create-tray-icon.js"
   },
@@ -24,8 +25,8 @@
   },
   "homepage": "https://github.com/LeonardoVidolin/razer-battery-widget#readme",
   "devDependencies": {
-    "electron": "^40.6.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1"
   },
   "overrides": {
     "glob": "^11.0.0",
@@ -34,6 +35,7 @@
   "build": {
     "appId": "com.razer.batterywidget",
     "productName": "Razer Battery Widget",
+    "forceCodeSigning": false,
     "directories": {
       "output": "dist"
     },
