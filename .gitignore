@@ -1,5 +1,10 @@
 node_modules/
 dist/
+dist-new/
+dist-build/
+dist-install/
 *.log
 .DS_Store
 .electron-userdata/
+# Local copy-paste drafts (not part of releases)
+docs/FORUM_POST.txt

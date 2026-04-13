@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { RazerWatcher } = require('./watcher/razer_watcher');
@@ -10,6 +10,76 @@ if (!app.isPackaged) {
 }
 
 let mainWindow = null;
+let windowResizeSession = null;
+
+/** Default / design size (also used for 50% minimum math). */
+const DEFAULT_WINDOW_WIDTH = 440;
+const DEFAULT_WINDOW_HEIGHT = 292;
+const MIN_WINDOW_WIDTH = Math.round(DEFAULT_WINDOW_WIDTH * 0.5);
+const MIN_WINDOW_HEIGHT_COLLAPSED = Math.round(DEFAULT_WINDOW_HEIGHT * 0.5);
+/** When volume panel is visible: min height to avoid overlap (~20% below previous 332px cap). */
+const MIN_WINDOW_HEIGHT_VOLUME_OPEN = 266;
+
+const RESIZE_MAX_W = 2400;
+const RESIZE_MAX_H = 1800;
+
+function getWindowMinimumHeight() {
+  const s = loadSettings();
+  return s.volumePanelVisible !== false ? MIN_WINDOW_HEIGHT_VOLUME_OPEN : MIN_WINDOW_HEIGHT_COLLAPSED;
+}
+
+function getResizeMinimums() {
+  return { w: MIN_WINDOW_WIDTH, h: getWindowMinimumHeight() };
+}
+
+function applyWindowMinimumConstraints() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const minW = MIN_WINDOW_WIDTH;
+  const minH = getWindowMinimumHeight();
+  mainWindow.setMinimumSize(minW, minH);
+  const b = mainWindow.getBounds();
+  let { x, y, width, height } = b;
+  let changed = false;
+  if (width < minW) {
+    width = minW;
+    changed = true;
+  }
+  if (height < minH) {
+    height = minH;
+    changed = true;
+  }
+  if (changed) mainWindow.setBounds({ x, y, width, height }, false);
+}
+
+function computeResizedBounds(orig, edge, dx, dy) {
+  const { w: RESIZE_MIN_W, h: RESIZE_MIN_H } = getResizeMinimums();
+  let x = orig.x;
+  let y = orig.y;
+  let width = orig.width;
+  let height = orig.height;
+  const e = String(edge || '');
+
+  if (e.includes('n')) {
+    let newH = orig.height - dy;
+    newH = Math.min(RESIZE_MAX_H, Math.max(RESIZE_MIN_H, newH));
+    y = orig.y + orig.height - newH;
+    height = newH;
+  }
+  if (e.includes('s')) {
+    height = Math.min(RESIZE_MAX_H, Math.max(RESIZE_MIN_H, orig.height + dy));
+  }
+  if (e.includes('w')) {
+    let newW = orig.width - dx;
+    newW = Math.min(RESIZE_MAX_W, Math.max(RESIZE_MIN_W, newW));
+    x = orig.x + orig.width - newW;
+    width = newW;
+  }
+  if (e.includes('e')) {
+    width = Math.min(RESIZE_MAX_W, Math.max(RESIZE_MIN_W, orig.width + dx));
+  }
+
+  return { x, y, width, height };
+}
 let razerWatcher = null;
 let tray = null;
 let isQuitting = false;
@@ -31,7 +101,12 @@ function loadSettings() {
 }
 
 function defaultSettings() {
-  return { openAtLogin: true, alwaysOnTop: true };
+  return {
+    openAtLogin: true,
+    alwaysOnTop: true,
+    volumePanelVisible: true,
+    windowBounds: null,
+  };
 }
 
 function saveSettings(settings) {
@@ -113,13 +188,33 @@ function createWindow() {
     return;
   }
 
-  const winAlwaysOnTop = !!loadSettings().alwaysOnTop;
+  const settingsForWin = loadSettings();
+  const winAlwaysOnTop = !!settingsForWin.alwaysOnTop;
+  const wb = settingsForWin.windowBounds;
+  const minW0 = MIN_WINDOW_WIDTH;
+  const minH0 = getWindowMinimumHeight();
+  let winW = DEFAULT_WINDOW_WIDTH;
+  let winH = DEFAULT_WINDOW_HEIGHT;
+  let winX;
+  let winY;
+  if (wb && typeof wb.width === 'number' && typeof wb.height === 'number') {
+    winW = Math.max(minW0, Math.min(2000, Math.round(wb.width)));
+    winH = Math.max(minH0, Math.min(1600, Math.round(wb.height)));
+    if (typeof wb.x === 'number' && typeof wb.y === 'number') {
+      winX = Math.round(wb.x);
+      winY = Math.round(wb.y);
+    }
+  }
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 292,
+    width: winW,
+    height: winH,
+    x: winX,
+    y: winY,
+    minWidth: minW0,
+    minHeight: minH0,
     frame: false,
     transparent: true,
-    resizable: false,
+    resizable: true,
     show: false,
     skipTaskbar: true,
     alwaysOnTop: winAlwaysOnTop,
@@ -134,10 +229,14 @@ function createWindow() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     showWidgetWithoutStealingFocus();
   });
-  mainWindow.on('show', () => applyAlwaysOnTopToMainWindow());
+  mainWindow.on('show', () => {
+    applyAlwaysOnTopToMainWindow();
+    applyWindowMinimumConstraints();
+  });
   mainWindow.webContents.once('did-finish-load', () => {
     pushDevicesToRenderer();
     applyAlwaysOnTopToMainWindow();
+    applyWindowMinimumConstraints();
   });
   mainWindow.loadFile('index.html');
   mainWindow.setIgnoreMouseEvents(false);
@@ -148,6 +247,25 @@ function createWindow() {
       mainWindow.hide();
     }
   });
+
+  let boundsSaveTimer = null;
+  function scheduleSaveWindowBounds() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    clearTimeout(boundsSaveTimer);
+    boundsSaveTimer = setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      const b = mainWindow.getBounds();
+      const s = loadSettings();
+      saveSettings({
+        ...s,
+        windowBounds: { width: b.width, height: b.height, x: b.x, y: b.y },
+      });
+    }, 450);
+  }
+  mainWindow.on('resize', scheduleSaveWindowBounds);
+  mainWindow.on('move', scheduleSaveWindowBounds);
+
+  applyWindowMinimumConstraints();
 }
 
 function createTray() {
@@ -307,4 +425,46 @@ ipcMain.handle('set-always-on-top', (_, value) => {
   saveSettings(settings);
   applyAlwaysOnTopToMainWindow();
   updateTrayMenu();
+});
+ipcMain.handle('set-volume-panel-visible', (_, value) => {
+  const settings = loadSettings();
+  settings.volumePanelVisible = !!value;
+  saveSettings(settings);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    applyWindowMinimumConstraints();
+    if (value) {
+      const minH = getWindowMinimumHeight();
+      const b = mainWindow.getBounds();
+      if (b.height < minH) {
+        mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: minH }, false);
+      }
+    }
+  }
+});
+
+ipcMain.on('window-resize-start', (event, edge) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  windowResizeSession = {
+    win,
+    edge: String(edge || ''),
+    orig: win.getBounds(),
+    start: screen.getCursorScreenPoint(),
+  };
+});
+
+ipcMain.on('window-resize-move', (event, point) => {
+  if (!windowResizeSession || windowResizeSession.win.isDestroyed()) return;
+  const { win, edge, orig, start } = windowResizeSession;
+  const pt =
+    point && typeof point.x === 'number' && typeof point.y === 'number'
+      ? { x: point.x, y: point.y }
+      : screen.getCursorScreenPoint();
+  const dx = pt.x - start.x;
+  const dy = pt.y - start.y;
+  win.setBounds(computeResizedBounds(orig, edge, dx, dy));
+});
+
+ipcMain.on('window-resize-end', () => {
+  windowResizeSession = null;
 });

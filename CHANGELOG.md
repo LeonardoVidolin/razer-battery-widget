@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.2.0] — 2026-04-02
+
+### Added
+
+- **Resizable frameless window** — Drag edges and corners (including invisible border hit-zones); bounds are saved.
+- **Volume panel toggle** — Show or hide the volume section from the divider control; state is persisted.
+- **Compact layout** — When the window is very small, rings and typography scale down; battery percentage stays visible.
+
+### Changed
+
+- **Minimum size** — Floor at **50%** of the default footprint (**220×146** with volume hidden, **220×266** with volume shown).
+- **Build reliability (Windows)** — `forceCodeSigning: false` and `signAndEditExecutable: false` to avoid symlink/signing issues during packaging.
+- **Alternate dist outputs** — `npm run dist:fresh` → `dist-new/`, `npm run dist:install` → `dist-install/` when `dist/` or `app.asar` is locked.
+
+### Documentation
+
+- README: resize behavior, compact mode, and troubleshooting for locked build folders.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.2.0.exe`.
+
 ## [1.1.0] — 2026-04-09
 
 ### Added
@@ -21,3 +43,4 @@
 ## [1.0.0] — earlier
 
 - Initial version published in this repository.
+
