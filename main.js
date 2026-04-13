@@ -17,8 +17,8 @@ const DEFAULT_WINDOW_WIDTH = 440;
 const DEFAULT_WINDOW_HEIGHT = 292;
 const MIN_WINDOW_WIDTH = Math.round(DEFAULT_WINDOW_WIDTH * 0.5);
 const MIN_WINDOW_HEIGHT_COLLAPSED = Math.round(DEFAULT_WINDOW_HEIGHT * 0.5);
-/** When volume panel is visible, enforce this height so battery % and sliders do not overlap. */
-const MIN_WINDOW_HEIGHT_VOLUME_OPEN = 332;
+/** When volume panel is visible: min height to avoid overlap (~20% below previous 332px cap). */
+const MIN_WINDOW_HEIGHT_VOLUME_OPEN = 266;
 
 const RESIZE_MAX_W = 2400;
 const RESIZE_MAX_H = 1800;

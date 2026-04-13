@@ -377,9 +377,16 @@ body {
   margin-top: 4px;
 }
 
-.widget--compact .percentage,
+.widget--compact .percentage {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+
 .widget--compact .placeholder {
-  display: none;
+  margin-top: 4px;
+  font-size: 10px;
 }
 
 .widget--compact .device-slot,

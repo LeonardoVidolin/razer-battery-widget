@@ -8,6 +8,7 @@
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
     "dist": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never",
     "dist:fresh": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never -c.directories.output=dist-new",
+    "dist:install": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never -c.directories.output=dist-install",
     "tray-icon": "node scripts/create-tray-icon.js",
     "prepare": "node scripts/create-tray-icon.js"
   },

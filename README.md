@@ -42,7 +42,7 @@ A lightweight Windows desktop widget that shows battery level and charging statu
 ## Usage
 
 - **Move the widget** — Drag it by the background (the card is draggable; a small transparent margin around it keeps the window edges resizable)
-- **Resize** — Drag any window edge or corner to change size (including dedicated invisible hit-zones on the frameless border); dimensions are remembered. Minimum size is **50%** of the default footprint (**220×146** when the volume section is hidden, **220×332** when it is shown so nothing overlaps). Very small windows switch to a **compact** layout (smaller rings, no battery % under icons, slimmer volume rows).
+- **Resize** — Drag any window edge or corner to change size (including dedicated invisible hit-zones on the frameless border); dimensions are remembered. Minimum size is **50%** of the default footprint (**220×146** when the volume section is hidden, **220×266** when it is shown). Very small windows switch to a **compact** layout (smaller rings, smaller battery % text, slimmer volume rows).
 - **Volume section** — Use the small button on the divider line to show or hide the volume sliders (audio keeps working; only the UI is hidden)
 - **Minimize** — Close the window; the app stays in the system tray
 - **Show again** — Double-click the tray icon or right-click → **Show Widget**
@@ -81,7 +81,7 @@ npm start
 npm run build
 ```
 
-The installer is created in the `dist/` folder. If the build fails because `app.asar` is locked, close the Razer Battery Widget (and any dev `npm start` instance), or run **`npm run dist:fresh`** to build into `dist-new/` instead.
+The installer is created in the `dist/` folder. If the build fails because `app.asar` is locked, close the Razer Battery Widget (and any dev `npm start` instance), or run **`npm run dist:fresh`** (output in `dist-new/`) or **`npm run dist:install`** (output in `dist-install/`).
 
 ### How it works
 
