@@ -128,6 +128,27 @@ function saveSettings(settings) {
   }
 }
 
+/**
+ * Register/unregister start-at-login. In dev, a bare setLoginItemSettings would register
+ * node_modules electron.exe with no app path (login then opens the Electron welcome window),
+ * so pass the app path explicitly.
+ */
+function applyOpenAtLogin(enabled) {
+  try {
+    if (app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: !!enabled });
+    } else {
+      app.setLoginItemSettings({
+        openAtLogin: !!enabled,
+        path: process.execPath,
+        args: [app.getAppPath()],
+      });
+    }
+  } catch (e) {
+    console.warn('applyOpenAtLogin:', e.message);
+  }
+}
+
 /** Windows Z-order levels (Electron): higher tiers beat games/fullscreen better; fallback if one fails. */
 const WIN32_ALWAYS_ON_TOP_LEVELS = ['screen-saver', 'pop-up-menu', 'floating'];
 
@@ -404,7 +425,7 @@ function updateTrayMenu() {
       click: (item) => {
         const next = { ...loadSettings(), openAtLogin: item.checked };
         saveSettings(next);
-        app.setLoginItemSettings({ openAtLogin: next.openAtLogin });
+        applyOpenAtLogin(next.openAtLogin);
       },
     },
     {
@@ -426,7 +447,7 @@ function updateTrayMenu() {
 
 app.whenReady().then(() => {
   const settings = loadSettings();
-  app.setLoginItemSettings({ openAtLogin: settings.openAtLogin });
+  applyOpenAtLogin(settings.openAtLogin);
 
   razerWatcher = new RazerWatcher(() => pushDevicesToRenderer());
   razerWatcher.initialize();
@@ -524,7 +545,7 @@ ipcMain.handle('set-open-at-login', (_, value) => {
   const settings = loadSettings();
   settings.openAtLogin = !!value;
   saveSettings(settings);
-  app.setLoginItemSettings({ openAtLogin: settings.openAtLogin });
+  applyOpenAtLogin(settings.openAtLogin);
   updateTrayMenu();
 });
 ipcMain.handle('quit-app', () => {
