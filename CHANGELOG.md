@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0] — 2026-08-19
+
+### Added
+
+- **Hide unused devices** — Toggle each device slot (Headphones / Keyboard / Mouse) from the tray menu, or right-click a device in the widget to hide it. Choice is persisted; only the devices you actually use stay visible.
+- **In-app context menu** — Right-click anywhere in the widget (outside a device) for the same menu as the tray: device toggles, Always on top, Start with Windows, Quit. Checkbox items keep the menu open, so several devices can be toggled in one go.
+- **Tray menu stays handy for multi-toggle** — Device toggles now sit at the tray menu root and the menu reopens right after each toggle (native menus always close on click), so re-enabling several devices is quick.
+
+### Fixed
+
+- **Volume panel resize** — Closing the volume panel now restores the window to the height it had before opening the panel forced it taller (it previously stayed stuck at the expanded size). A manual resize while the panel is open is respected and not undone.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.3.0.exe`.
+
 ## [1.2.0] — 2026-04-02
 
 ### Added
