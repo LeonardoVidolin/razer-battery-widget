@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setOpenAtLogin: (value) => ipcRenderer.invoke('set-open-at-login', value),
   quitApp: () => ipcRenderer.invoke('quit-app'),
   focusWindow: () => ipcRenderer.invoke('focus-widget-window'),
+  setTrayBatteryIcons: (list) => ipcRenderer.invoke('set-tray-battery-icons', list),
+  setTrayIconsEnabled: (value) => ipcRenderer.invoke('set-tray-icons-enabled', value),
   onOpenContextMenuAt: (cb) => {
     ipcRenderer.on('open-context-menu-at', (_e, point) => cb(point));
   },
