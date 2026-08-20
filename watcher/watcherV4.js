@@ -38,6 +38,7 @@ class WatcherV4 extends WatchProcess {
     super(onDeviceUpdate);
     this.watcher = null;
     this.synapseV4LogPath = null;
+    this.candidatePaths = [];
     this.retryTimeout = null;
     this.pollInterval = null;
     this.latestParsedTimestamp = '';
@@ -70,6 +71,7 @@ class WatcherV4 extends WatchProcess {
 
   findLatestLogFile() {
     this.synapseV4LogPath = null;
+    this.candidatePaths = [];
     try {
       if (!fs.existsSync(SynapseV4LogDir)) return;
       const candidates = fs.readdirSync(SynapseV4LogDir)
@@ -84,7 +86,8 @@ class WatcherV4 extends WatchProcess {
         });
       if (candidates.length > 0) {
         candidates.sort((a, b) => (b.index || 0) - (a.index || 0));
-        this.synapseV4LogPath = path.resolve(SynapseV4LogDir, candidates[0].fileName);
+        this.candidatePaths = candidates.map((c) => path.resolve(SynapseV4LogDir, c.fileName));
+        this.synapseV4LogPath = this.candidatePaths[0];
       }
     } catch (e) {
       console.warn('WatcherV4 find log error:', e.message);
@@ -99,15 +102,29 @@ class WatcherV4 extends WatchProcess {
 
   async onLogChanged(forceRefresh = false) {
     if (!this.synapseV4LogPath) return;
-    const batteryStateRegex = /^\[(?<timestamp>.+?)\].*connectingDeviceData: (?<json>.+)$/gm;
     try {
-      const log = await fsp.readFile(this.synapseV4LogPath, { encoding: 'utf8' });
-      const matches = [];
-      let m;
-      while ((m = batteryStateRegex.exec(log))) {
-        matches.push({ timestamp: m.groups.timestamp, jsonStr: m.groups.json });
+      // Newest log first; right after Synapse rotates its logs the newest file has no
+      // battery lines yet, so fall back to older ones until one has data.
+      const paths = this.candidatePaths.length ? this.candidatePaths : [this.synapseV4LogPath];
+      let lastMatch = null;
+      for (const p of paths) {
+        let log;
+        try {
+          log = await fsp.readFile(p, { encoding: 'utf8' });
+        } catch (_) {
+          continue;
+        }
+        const batteryStateRegex = /^\[(?<timestamp>.+?)\].*connectingDeviceData: (?<json>.+)$/gm;
+        const matches = [];
+        let m;
+        while ((m = batteryStateRegex.exec(log))) {
+          matches.push({ timestamp: m.groups.timestamp, jsonStr: m.groups.json });
+        }
+        if (matches.length > 0) {
+          lastMatch = matches[matches.length - 1];
+          break;
+        }
       }
-      const lastMatch = matches[matches.length - 1];
       if (!lastMatch) return;
       let devicesList;
       try {

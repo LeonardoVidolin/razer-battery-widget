@@ -102,6 +102,109 @@
     };
   }
 
+  function trayIconColor(pct) {
+    if (pct <= 20) return '#ff4444';
+    if (pct <= 40) return '#b8e600';
+    return '#00ff00';
+  }
+
+  // Device glyphs (same SVGs as the widget) pre-loaded as images for the tray icon canvas.
+  const TRAY_GLYPHS = {};
+  for (const t of DEVICE_TYPES) {
+    const svg = ICONS[t.key];
+    if (!svg) continue;
+    const xml = svg.replace(
+      '<svg ',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" '
+    ).replace(/currentColor/g, '#ffffff');
+    const img = new Image();
+    const entry = { img, ready: false };
+    img.onload = () => {
+      entry.ready = true;
+    };
+    img.src = `data:image/svg+xml;utf8,${encodeURIComponent(xml)}`;
+    TRAY_GLYPHS[t.key] = entry;
+  }
+
+  /** Battery number over a dimmed device glyph, as a 64x64 PNG (main derives 16/24/32px DPI variants). */
+  function drawTrayIconDataURL(pct, charging, type) {
+    const S = 64;
+    const c = document.createElement('canvas');
+    c.width = S;
+    c.height = S;
+    const ctx = c.getContext('2d');
+    // Solid device glyph in the top-left corner so each icon is identifiable at a glance;
+    // the battery number sits bottom-right like a badge.
+    const glyph = TRAY_GLYPHS[type];
+    if (glyph && glyph.ready) {
+      const gs = 34;
+      const tinted = (color) => {
+        const oc = document.createElement('canvas');
+        oc.width = gs;
+        oc.height = gs;
+        const octx = oc.getContext('2d');
+        octx.drawImage(glyph.img, 0, 0, gs, gs);
+        octx.globalCompositeOperation = 'source-in';
+        octx.fillStyle = color;
+        octx.fillRect(0, 0, gs, gs);
+        return oc;
+      };
+      ctx.drawImage(tinted('rgba(0, 0, 0, 0.9)'), 1, 1);
+      ctx.drawImage(tinted(trayIconColor(pct)), 0, 0);
+    }
+    const text = String(pct);
+    let fontSize = 50;
+    while (fontSize > 16) {
+      ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
+      if (ctx.measureText(text).width <= 47) break;
+      fontSize -= 2;
+    }
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    // Dark outline keeps the number readable on light taskbars and over the glyph.
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.strokeText(text, S - 1, 44);
+    ctx.fillStyle = trayIconColor(pct);
+    ctx.fillText(text, S - 1, 44);
+    if (charging) {
+      ctx.beginPath();
+      ctx.moveTo(16, 30);
+      ctx.lineTo(4, 46);
+      ctx.lineTo(11, 46);
+      ctx.lineTo(6, 62);
+      ctx.lineTo(19, 44);
+      ctx.lineTo(12, 44);
+      ctx.closePath();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.stroke();
+      ctx.fillStyle = '#ffd24a';
+      ctx.fill();
+    }
+    return c.toDataURL('image/png');
+  }
+
+  function sendTrayBatteryIcons(byType) {
+    if (!window.electronAPI || typeof window.electronAPI.setTrayBatteryIcons !== 'function') return;
+    const items = [];
+    for (const t of DEVICE_TYPES) {
+      if (deviceVisibility[t.key] === false) continue;
+      const d = byType[t.key];
+      if (!d || d.handle == null) continue;
+      const pct = Math.max(0, Math.min(100, Math.round(Number(d.batteryPercentage) || 0)));
+      const charging = !!d.isCharging;
+      items.push({
+        handle: String(d.handle),
+        name: d.name || t.label,
+        pct,
+        charging,
+        dataURL: drawTrayIconDataURL(pct, charging, t.key),
+      });
+    }
+    window.electronAPI.setTrayBatteryIcons(items);
+  }
+
   function render(devices) {
     if (Array.isArray(devices)) lastDevices = devices;
     const byType = pickDevicesByType(lastDevices, deviceVisibility);
@@ -109,6 +212,7 @@
     container.innerHTML = DEVICE_TYPES.filter((t) => deviceVisibility[t.key] !== false)
       .map((t) => renderDevice(t.key, byType[t.key], t.label))
       .join('');
+    sendTrayBatteryIcons(byType);
   }
 
   function setDeviceTypeVisible(type, visible) {
@@ -145,6 +249,7 @@
       <div class="context-menu-sep"></div>
       <button type="button" class="context-menu-item" data-menu-action="always-on-top">${check}Always on top</button>
       <button type="button" class="context-menu-item" data-menu-action="open-at-login">${check}Start with Windows</button>
+      <button type="button" class="context-menu-item" data-menu-action="tray-icons">${check}Battery icons in taskbar</button>
       <div class="context-menu-sep"></div>
       <button type="button" class="context-menu-item" data-menu-action="quit"><span class="context-menu-check"></span>Quit</button>
     `;
@@ -164,11 +269,12 @@
         return; // keep the menu open for more toggles
       }
       const action = item.dataset.menuAction;
-      if (action === 'always-on-top' || action === 'open-at-login') {
+      if (action === 'always-on-top' || action === 'open-at-login' || action === 'tray-icons') {
         const next = !item.classList.contains('checked');
         item.classList.toggle('checked', next);
         if (action === 'always-on-top' && typeof api.setAlwaysOnTop === 'function') api.setAlwaysOnTop(next);
         if (action === 'open-at-login' && typeof api.setOpenAtLogin === 'function') api.setOpenAtLogin(next);
+        if (action === 'tray-icons' && typeof api.setTrayIconsEnabled === 'function') api.setTrayIconsEnabled(next);
         return; // keep the menu open
       }
       if (action === 'quit') {
@@ -186,8 +292,10 @@
     });
     const aot = el.querySelector('[data-menu-action="always-on-top"]');
     const oal = el.querySelector('[data-menu-action="open-at-login"]');
+    const tico = el.querySelector('[data-menu-action="tray-icons"]');
     if (aot) aot.classList.toggle('checked', !settings || settings.alwaysOnTop !== false);
     if (oal) oal.classList.toggle('checked', !settings || settings.openAtLogin !== false);
+    if (tico) tico.classList.toggle('checked', !settings || settings.deviceTrayIcons !== false);
     el.hidden = false;
     // Suspend the window drag region while open so any click inside the widget reaches
     // the page (and closes the menu) instead of starting a window drag.

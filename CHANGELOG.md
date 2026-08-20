@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0] — 2026-08-19
+
+### Added
+
+- **Battery icons in the taskbar tray** — one icon per active (non-hidden) device: the device glyph (mouse / keyboard / headphones) in the top-left corner and the battery number as a badge in the bottom-right, colored like the widget rings (green / yellow ≤40% / red ≤20%) with a lightning bolt while charging. DPI-aware (16/24/32px variants). Tooltip shows the device name and level; double-click shows the widget; right-click opens the usual menu. Toggle via **Battery icons in taskbar** in the tray or in-app context menu.
+
+### Fixed
+
+- **Synapse 4 log rotation** — right after Synapse rotates its systray logs, the newest file has no battery lines yet and the widget showed no devices; the watcher now falls back to older systray logs until one has data.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.4.0.exe`.
+
 ## [1.3.0] — 2026-08-19
 
 ### Added

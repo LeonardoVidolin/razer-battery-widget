@@ -114,6 +114,7 @@ function defaultSettings() {
     alwaysOnTop: true,
     volumePanelVisible: true,
     deviceVisibility: { headphones: true, keyboard: true, mouse: true },
+    deviceTrayIcons: true,
     windowBounds: null,
   };
 }
@@ -335,6 +336,28 @@ function setDeviceTypeVisible(typeKey, visible) {
   return settings;
 }
 
+/** Per-device taskbar battery icons (rendered as canvas PNGs by the renderer). */
+const deviceTrays = new Map(); // device handle -> Tray
+
+function destroyDeviceTrays() {
+  for (const t of deviceTrays.values()) {
+    try {
+      t.destroy();
+    } catch (_) {}
+  }
+  deviceTrays.clear();
+}
+
+function setTrayIconsEnabled(enabled) {
+  const settings = loadSettings();
+  settings.deviceTrayIcons = !!enabled;
+  saveSettings(settings);
+  if (!settings.deviceTrayIcons) destroyDeviceTrays();
+  updateTrayMenu();
+  // Re-render in the widget re-sends fresh icons when turning back on.
+  pushSettingsToRenderer();
+}
+
 /** Native menus always close on click; reopen right away so toggling several devices is quick. */
 function reopenTrayMenu() {
   if (!tray) return;
@@ -384,10 +407,21 @@ function updateTrayMenu() {
         app.setLoginItemSettings({ openAtLogin: next.openAtLogin });
       },
     },
+    {
+      label: 'Battery icons in taskbar',
+      type: 'checkbox',
+      checked: settings.deviceTrayIcons !== false,
+      click: (item) => setTrayIconsEnabled(item.checked),
+    },
     { type: 'separator' },
     { label: 'Quit', type: 'normal', click: () => { isQuitting = true; app.quit(); } },
   ]);
   tray.setContextMenu(menu);
+  for (const t of deviceTrays.values()) {
+    try {
+      t.setContextMenu(menu);
+    } catch (_) {}
+  }
 }
 
 app.whenReady().then(() => {
@@ -454,6 +488,7 @@ app.on('before-quit', () => {
     clearInterval(alwaysOnTopPollTimer);
     alwaysOnTopPollTimer = null;
   }
+  destroyDeviceTrays();
   if (tray) try { tray.destroy(); tray = null; } catch (_) {}
   if (razerWatcher) razerWatcher.stop();
   razerWatcher = null;
@@ -498,6 +533,61 @@ ipcMain.handle('quit-app', () => {
 });
 ipcMain.handle('focus-widget-window', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+});
+ipcMain.handle('set-tray-icons-enabled', (_, value) => setTrayIconsEnabled(value));
+ipcMain.handle('set-tray-battery-icons', (_, list) => {
+  if (isQuitting) return;
+  if (loadSettings().deviceTrayIcons === false) {
+    destroyDeviceTrays();
+    return;
+  }
+  const items = Array.isArray(list) ? list : [];
+  const seen = new Set();
+  let created = false;
+  for (const it of items) {
+    if (!it || !it.handle || typeof it.dataURL !== 'string') continue;
+    let icon;
+    try {
+      const src = nativeImage.createFromDataURL(it.dataURL);
+      if (src.isEmpty()) continue;
+      if (process.platform === 'win32') {
+        // DPI-aware variants so the icon stays crisp (and as large as the tray allows) on scaled displays.
+        icon = nativeImage.createEmpty();
+        icon.addRepresentation({ scaleFactor: 1.0, buffer: src.resize({ width: 16, height: 16 }).toPNG() });
+        icon.addRepresentation({ scaleFactor: 1.5, buffer: src.resize({ width: 24, height: 24 }).toPNG() });
+        icon.addRepresentation({ scaleFactor: 2.0, buffer: src.resize({ width: 32, height: 32 }).toPNG() });
+      } else {
+        icon = src;
+      }
+    } catch (_) {
+      continue;
+    }
+    const key = String(it.handle);
+    seen.add(key);
+    let t = deviceTrays.get(key);
+    if (!t) {
+      try {
+        t = new Tray(icon);
+      } catch (_) {
+        continue;
+      }
+      t.on('double-click', () => createWindow());
+      deviceTrays.set(key, t);
+      created = true;
+    } else {
+      t.setImage(icon);
+    }
+    const pct = Math.max(0, Math.min(100, Math.round(Number(it.pct) || 0)));
+    t.setToolTip(`${String(it.name || 'Device')} — ${pct}%${it.charging ? ' (charging)' : ''}`);
+  }
+  for (const [key, t] of deviceTrays) {
+    if (seen.has(key)) continue;
+    try {
+      t.destroy();
+    } catch (_) {}
+    deviceTrays.delete(key);
+  }
+  if (created) updateTrayMenu();
 });
 ipcMain.handle('set-always-on-top', (_, value) => {
   const settings = loadSettings();
