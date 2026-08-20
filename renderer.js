@@ -27,8 +27,8 @@
     return String(a.handle) < String(b.handle) ? a : b;
   }
 
-  /** Assign devices to slots by type; fill remaining slots with unmatched devices so nothing is hidden. */
-  function pickDevicesByType(devices) {
+  /** Assign devices to slots by type; fill remaining visible slots with unmatched devices so nothing is hidden. */
+  function pickDevicesByType(devices, visibility) {
     const byType = { headphones: null, keyboard: null, mouse: null };
     const assigned = new Set();
     for (const t of DEVICE_TYPES) {
@@ -39,7 +39,9 @@
       byType[t.key] = best;
       assigned.add(best.handle);
     }
-    const slots = ['headphones', 'keyboard', 'mouse'];
+    const slots = ['headphones', 'keyboard', 'mouse'].filter(
+      (s) => !visibility || visibility[s] !== false
+    );
     for (const d of devices) {
       if (assigned.has(d.handle)) continue;
       const empty = slots.find((s) => byType[s] === null);
@@ -68,14 +70,14 @@
     return '';
   }
 
-  function renderDevice(type, device) {
+  function renderDevice(type, device, label) {
     const icon = ICONS[type] || '';
     const pct = device ? device.batteryPercentage : 0;
     const offset = C - (pct / 100) * C;
     const charging = device && device.isCharging;
     const fillClass = device ? ringClass(pct) : '';
     return `
-      <div class="device ${device ? '' : 'empty-slot'}" data-type="${type}">
+      <div class="device ${device ? '' : 'empty-slot'}" data-type="${type}" title="${label} — right-click to hide">
         <div class="device-slot">
           <svg class="ring" viewBox="0 0 76 76">
             <circle class="ring-bg" cx="38" cy="38" r="${R}"/>
@@ -89,11 +91,147 @@
     `;
   }
 
-  function render(devices) {
-    const byType = pickDevicesByType(devices);
-    const container = document.getElementById('devices');
-    container.innerHTML = DEVICE_TYPES.map((t) => renderDevice(t.key, byType[t.key])).join('');
+  let deviceVisibility = { headphones: true, keyboard: true, mouse: true };
+  let lastDevices = [];
+
+  function normalizeDeviceVisibility(v) {
+    return {
+      headphones: !v || v.headphones !== false,
+      keyboard: !v || v.keyboard !== false,
+      mouse: !v || v.mouse !== false,
+    };
   }
+
+  function render(devices) {
+    if (Array.isArray(devices)) lastDevices = devices;
+    const byType = pickDevicesByType(lastDevices, deviceVisibility);
+    const container = document.getElementById('devices');
+    container.innerHTML = DEVICE_TYPES.filter((t) => deviceVisibility[t.key] !== false)
+      .map((t) => renderDevice(t.key, byType[t.key], t.label))
+      .join('');
+  }
+
+  function setDeviceTypeVisible(type, visible) {
+    deviceVisibility = { ...deviceVisibility, [type]: visible };
+    render(lastDevices);
+    if (window.electronAPI && typeof window.electronAPI.setDeviceVisibility === 'function') {
+      window.electronAPI.setDeviceVisibility(type, visible);
+    }
+  }
+
+  // In-app context menu (right-click outside a device): same items as the tray menu.
+  // Checkbox items keep the menu open so several devices can be toggled in one go.
+  const CONTEXT_MENU_ID = 'context-menu';
+
+  function closeContextMenu() {
+    const el = document.getElementById(CONTEXT_MENU_ID);
+    if (el) el.hidden = true;
+    document.body.classList.remove('context-menu-open');
+  }
+
+  function ensureContextMenu() {
+    let el = document.getElementById(CONTEXT_MENU_ID);
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = CONTEXT_MENU_ID;
+    el.className = 'context-menu';
+    el.hidden = true;
+    const check = '<span class="context-menu-check">✓</span>';
+    el.innerHTML = `
+      <div class="context-menu-header">Devices</div>
+      ${DEVICE_TYPES.map(
+        (t) => `<button type="button" class="context-menu-item" data-menu-device="${t.key}">${check}${t.label}</button>`
+      ).join('')}
+      <div class="context-menu-sep"></div>
+      <button type="button" class="context-menu-item" data-menu-action="always-on-top">${check}Always on top</button>
+      <button type="button" class="context-menu-item" data-menu-action="open-at-login">${check}Start with Windows</button>
+      <div class="context-menu-sep"></div>
+      <button type="button" class="context-menu-item" data-menu-action="quit"><span class="context-menu-check"></span>Quit</button>
+    `;
+    document.body.appendChild(el);
+
+    el.addEventListener('click', (e) => {
+      const item = e.target.closest('.context-menu-item');
+      if (!item) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const api = window.electronAPI || {};
+      const devType = item.dataset.menuDevice;
+      if (devType) {
+        const next = deviceVisibility[devType] === false;
+        item.classList.toggle('checked', next);
+        setDeviceTypeVisible(devType, next);
+        return; // keep the menu open for more toggles
+      }
+      const action = item.dataset.menuAction;
+      if (action === 'always-on-top' || action === 'open-at-login') {
+        const next = !item.classList.contains('checked');
+        item.classList.toggle('checked', next);
+        if (action === 'always-on-top' && typeof api.setAlwaysOnTop === 'function') api.setAlwaysOnTop(next);
+        if (action === 'open-at-login' && typeof api.setOpenAtLogin === 'function') api.setOpenAtLogin(next);
+        return; // keep the menu open
+      }
+      if (action === 'quit') {
+        closeContextMenu();
+        if (typeof api.quitApp === 'function') api.quitApp();
+      }
+    });
+    return el;
+  }
+
+  function openContextMenu(x, y, settings) {
+    const el = ensureContextMenu();
+    el.querySelectorAll('[data-menu-device]').forEach((b) => {
+      b.classList.toggle('checked', deviceVisibility[b.dataset.menuDevice] !== false);
+    });
+    const aot = el.querySelector('[data-menu-action="always-on-top"]');
+    const oal = el.querySelector('[data-menu-action="open-at-login"]');
+    if (aot) aot.classList.toggle('checked', !settings || settings.alwaysOnTop !== false);
+    if (oal) oal.classList.toggle('checked', !settings || settings.openAtLogin !== false);
+    el.hidden = false;
+    // Suspend the window drag region while open so any click inside the widget reaches
+    // the page (and closes the menu) instead of starting a window drag.
+    document.body.classList.add('context-menu-open');
+    const r = el.getBoundingClientRect();
+    el.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+    el.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+    // Take focus so a click outside the app blurs the window and closes the menu.
+    if (window.electronAPI && typeof window.electronAPI.focusWindow === 'function') {
+      window.electronAPI.focusWindow();
+    }
+  }
+
+  function requestContextMenuAt(x, y) {
+    const show = (s) => openContextMenu(x, y, s);
+    if (window.electronAPI && typeof window.electronAPI.getSettings === 'function') {
+      window.electronAPI.getSettings().then(show).catch(() => show(null));
+    } else {
+      show(null);
+    }
+  }
+
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const menuEl = document.getElementById(CONTEXT_MENU_ID);
+    if (menuEl && !menuEl.hidden && menuEl.contains(e.target)) return;
+    const dev = e.target.closest('.device');
+    if (dev && dev.dataset.type) {
+      // Right-click on a device still hides just that device.
+      closeContextMenu();
+      setDeviceTypeVisible(dev.dataset.type, false);
+      return;
+    }
+    requestContextMenuAt(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    const el = document.getElementById(CONTEXT_MENU_ID);
+    if (el && !el.hidden && !el.contains(e.target)) closeContextMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeContextMenu();
+  });
+  window.addEventListener('blur', closeContextMenu);
 
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn && window.electronAPI && typeof window.electronAPI.refreshDevices === 'function') {
@@ -307,16 +445,39 @@
     });
   }
 
-  window.addEventListener('resize', () => updateCompactLayout());
+  window.addEventListener('resize', () => {
+    updateCompactLayout();
+    closeContextMenu();
+  });
 
   if (window.electronAPI) {
     if (typeof window.electronAPI.getSettings === 'function') {
       window.electronAPI
         .getSettings()
-        .then((s) => applyVolumePanelVisible(s && s.volumePanelVisible !== false))
+        .then((s) => {
+          deviceVisibility = normalizeDeviceVisibility(s && s.deviceVisibility);
+          applyVolumePanelVisible(s && s.volumePanelVisible !== false);
+          render(lastDevices);
+        })
         .catch(() => applyVolumePanelVisible(true));
     } else {
       applyVolumePanelVisible(true);
+    }
+
+    if (typeof window.electronAPI.onSettingsUpdate === 'function') {
+      window.electronAPI.onSettingsUpdate((s) => {
+        deviceVisibility = normalizeDeviceVisibility(s && s.deviceVisibility);
+        render(lastDevices);
+      });
+    }
+
+    // Right-clicks on the window drag region are forwarded by the main process.
+    if (typeof window.electronAPI.onOpenContextMenuAt === 'function') {
+      window.electronAPI.onOpenContextMenuAt((pt) => {
+        if (pt && typeof pt.x === 'number' && typeof pt.y === 'number') {
+          requestContextMenuAt(pt.x, pt.y);
+        }
+      });
     }
 
     window.electronAPI.onDevicesUpdate(render);
