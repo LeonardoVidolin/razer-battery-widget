@@ -11,6 +11,8 @@ if (!app.isPackaged) {
 
 let mainWindow = null;
 let windowResizeSession = null;
+/** Height the window had before opening the volume panel forced it taller (restored on close). */
+let heightBeforeVolumeExpand = null;
 
 /** Default / design size (also used for 50% minimum math). */
 const DEFAULT_WINDOW_WIDTH = 440;
@@ -94,7 +96,13 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() {
   try {
     const data = fs.readFileSync(SETTINGS_PATH, 'utf8');
-    return { ...defaultSettings(), ...JSON.parse(data) };
+    const defaults = defaultSettings();
+    const parsed = JSON.parse(data);
+    return {
+      ...defaults,
+      ...parsed,
+      deviceVisibility: { ...defaults.deviceVisibility, ...(parsed.deviceVisibility || {}) },
+    };
   } catch (_) {
     return defaultSettings();
   }
@@ -105,6 +113,7 @@ function defaultSettings() {
     openAtLogin: true,
     alwaysOnTop: true,
     volumePanelVisible: true,
+    deviceVisibility: { headphones: true, keyboard: true, mouse: true },
     windowBounds: null,
   };
 }
@@ -241,6 +250,19 @@ function createWindow() {
   mainWindow.loadFile('index.html');
   mainWindow.setIgnoreMouseEvents(false);
 
+  // Right-click on the drag region never reaches the page (it's treated as window caption),
+  // so catch it here and let the renderer open the in-app context menu at the cursor.
+  mainWindow.on('system-context-menu', (event) => {
+    event.preventDefault();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const cursor = screen.getCursorScreenPoint();
+    const b = mainWindow.getBounds();
+    mainWindow.focus();
+    try {
+      mainWindow.webContents.send('open-context-menu-at', { x: cursor.x - b.x, y: cursor.y - b.y });
+    } catch (_) {}
+  });
+
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
@@ -287,10 +309,60 @@ function createTray() {
   updateTrayMenu();
 }
 
-function updateTrayMenu() {
+function pushSettingsToRenderer() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    const wc = mainWindow.webContents;
+    if (wc.isDestroyed()) return;
+    wc.send('settings-update', loadSettings());
+  } catch (e) {
+    console.warn('pushSettingsToRenderer:', e.message);
+  }
+}
+
+const DEVICE_SLOT_TYPES = [
+  { key: 'headphones', label: 'Headphones' },
+  { key: 'keyboard', label: 'Keyboard' },
+  { key: 'mouse', label: 'Mouse' },
+];
+
+function setDeviceTypeVisible(typeKey, visible) {
   const settings = loadSettings();
+  settings.deviceVisibility = { ...settings.deviceVisibility, [typeKey]: !!visible };
+  saveSettings(settings);
+  updateTrayMenu();
+  pushSettingsToRenderer();
+  return settings;
+}
+
+/** Native menus always close on click; reopen right away so toggling several devices is quick. */
+function reopenTrayMenu() {
+  if (!tray) return;
+  setTimeout(() => {
+    if (!tray || isQuitting) return;
+    try {
+      tray.popUpContextMenu();
+    } catch (_) {}
+  }, 0);
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const settings = loadSettings();
+  const vis = settings.deviceVisibility || {};
   const menu = Menu.buildFromTemplate([
     { label: 'Show Widget', type: 'normal', click: () => createWindow() },
+    { type: 'separator' },
+    { label: 'Devices', enabled: false },
+    ...DEVICE_SLOT_TYPES.map(({ key, label }) => ({
+      label,
+      type: 'checkbox',
+      checked: vis[key] !== false,
+      click: (item) => {
+        setDeviceTypeVisible(key, item.checked);
+        reopenTrayMenu();
+      },
+    })),
     { type: 'separator' },
     {
       label: 'Always on top',
@@ -418,6 +490,14 @@ ipcMain.handle('set-open-at-login', (_, value) => {
   settings.openAtLogin = !!value;
   saveSettings(settings);
   app.setLoginItemSettings({ openAtLogin: settings.openAtLogin });
+  updateTrayMenu();
+});
+ipcMain.handle('quit-app', () => {
+  isQuitting = true;
+  app.quit();
+});
+ipcMain.handle('focus-widget-window', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
 });
 ipcMain.handle('set-always-on-top', (_, value) => {
   const settings = loadSettings();
@@ -430,21 +510,32 @@ ipcMain.handle('set-volume-panel-visible', (_, value) => {
   const settings = loadSettings();
   settings.volumePanelVisible = !!value;
   saveSettings(settings);
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    applyWindowMinimumConstraints();
-    if (value) {
-      const minH = getWindowMinimumHeight();
-      const b = mainWindow.getBounds();
-      if (b.height < minH) {
-        mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: minH }, false);
-      }
-    }
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const before = mainWindow.getBounds();
+  applyWindowMinimumConstraints();
+  if (value) {
+    // applyWindowMinimumConstraints already grew the window if needed; remember
+    // the pre-expand height so closing the panel returns to the original size.
+    heightBeforeVolumeExpand = before.height < getWindowMinimumHeight() ? before.height : null;
+  } else if (heightBeforeVolumeExpand !== null) {
+    const b = mainWindow.getBounds();
+    const restored = Math.max(MIN_WINDOW_HEIGHT_COLLAPSED, Math.round(heightBeforeVolumeExpand));
+    mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: restored }, false);
+    heightBeforeVolumeExpand = null;
   }
+});
+
+ipcMain.handle('set-device-visibility', (_, payload) => {
+  const typeKey = payload && String(payload.type);
+  if (!DEVICE_SLOT_TYPES.some((t) => t.key === typeKey)) return loadSettings();
+  return setDeviceTypeVisible(typeKey, payload.visible);
 });
 
 ipcMain.on('window-resize-start', (event, edge) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win || win.isDestroyed()) return;
+  // A manual resize expresses a new preferred size; don't undo it when the volume panel closes.
+  heightBeforeVolumeExpand = null;
   windowResizeSession = {
     win,
     edge: String(edge || ''),
