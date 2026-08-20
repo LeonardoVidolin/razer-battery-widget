@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] — 2026-08-20
+
+### Fixed
+
+- **Start with Windows (dev)** — in dev mode the login item was registered as bare `electron.exe` with no app path, so logging into Windows opened the Electron welcome window instead of the widget. The app path is now passed as an argument when not packaged; packaged builds are unaffected.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.4.1.exe`.
+
 ## [1.4.0] — 2026-08-19
 
 ### Added
