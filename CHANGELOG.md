@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.2] — 2026-10-03
+
+### Fixed
+
+- **Widget opening off-screen** — after rearranging or unplugging a monitor, the saved window position could fall outside every display, so the widget ran (tray icon visible) but never appeared. Saved bounds are now pulled onto the nearest display at startup, when shown from the tray, and whenever a display is removed or reconfigured.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.4.2.exe`.
+
 ## [1.4.1] — 2026-08-20
 
 ### Fixed
