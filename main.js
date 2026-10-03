@@ -184,8 +184,39 @@ function applyAlwaysOnTopToMainWindow() {
   }
 }
 
+/** Minimum visible overlap (px) with a display's work area for saved bounds to count as on-screen. */
+const MIN_VISIBLE_OVERLAP = 60;
+
+function isBoundsVisible(b) {
+  return screen.getAllDisplays().some(({ workArea: wa }) => {
+    const ox = Math.min(b.x + b.width, wa.x + wa.width) - Math.max(b.x, wa.x);
+    const oy = Math.min(b.y + b.height, wa.y + wa.height) - Math.max(b.y, wa.y);
+    // Top edge must be inside the display too, so the drag region stays reachable.
+    return ox >= MIN_VISIBLE_OVERLAP && oy >= MIN_VISIBLE_OVERLAP && b.y >= wa.y;
+  });
+}
+
+/** Returns bounds moved onto the nearest display if they are off-screen (e.g. monitor unplugged or rearranged). */
+function fitBoundsToScreen(b) {
+  if (isBoundsVisible(b)) return b;
+  const wa = screen.getDisplayMatching(b).workArea;
+  const width = Math.min(b.width, wa.width);
+  const height = Math.min(b.height, wa.height);
+  const x = Math.min(Math.max(b.x, wa.x), wa.x + wa.width - width);
+  const y = Math.min(Math.max(b.y, wa.y), wa.y + wa.height - height);
+  return { x, y, width, height };
+}
+
+function ensureMainWindowOnScreen() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const b = mainWindow.getBounds();
+  const fitted = fitBoundsToScreen(b);
+  if (fitted !== b) mainWindow.setBounds(fitted, false);
+}
+
 function showWidgetWithoutStealingFocus() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  ensureMainWindowOnScreen();
   if (typeof mainWindow.showInactive === 'function') mainWindow.showInactive();
   else mainWindow.show();
   applyAlwaysOnTopToMainWindow();
@@ -232,8 +263,9 @@ function createWindow() {
     winW = Math.max(minW0, Math.min(2000, Math.round(wb.width)));
     winH = Math.max(minH0, Math.min(1600, Math.round(wb.height)));
     if (typeof wb.x === 'number' && typeof wb.y === 'number') {
-      winX = Math.round(wb.x);
-      winY = Math.round(wb.y);
+      const fitted = fitBoundsToScreen({ x: Math.round(wb.x), y: Math.round(wb.y), width: winW, height: winH });
+      winX = fitted.x;
+      winY = fitted.y;
     }
   }
   mainWindow = new BrowserWindow({
@@ -448,6 +480,9 @@ function updateTrayMenu() {
 app.whenReady().then(() => {
   const settings = loadSettings();
   applyOpenAtLogin(settings.openAtLogin);
+
+  screen.on('display-removed', ensureMainWindowOnScreen);
+  screen.on('display-metrics-changed', ensureMainWindowOnScreen);
 
   razerWatcher = new RazerWatcher(() => pushDevicesToRenderer());
   razerWatcher.initialize();
