@@ -376,8 +376,27 @@ body {
   font-size: 15px;
 }
 
+/* Compact: no room beside the rings, so the controls become bare glyphs in the two top corners
+   (the only spots the round rings leave free). */
+.widget--compact .refresh-btn {
+  top: 2px;
+  left: 2px;
+  right: auto;
+  width: 20px;
+  height: 20px;
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.6;
+}
+
 .widget--compact .hide-btn {
-  right: 36px;
+  left: auto;
+  right: 2px;
+}
+
+.widget--compact .refresh-btn:hover {
+  opacity: 1;
+  background: rgba(0, 255, 0, 0.15);
 }
 
 .widget--compact .devices {
