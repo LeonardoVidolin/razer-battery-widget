@@ -156,6 +156,10 @@ body {
   z-index: 10;
 }
 
+.hide-btn {
+  right: 44px;
+}
+
 .refresh-btn:hover {
   background: rgba(0, 255, 0, 0.22);
 }
@@ -370,6 +374,10 @@ body {
   width: 24px;
   height: 24px;
   font-size: 15px;
+}
+
+.widget--compact .hide-btn {
+  right: 36px;
 }
 
 .widget--compact .devices {

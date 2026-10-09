@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { RazerWatcher } = require('./watcher/razer_watcher');
 const { readWindowsAudioLevels, setWindowsAudioLevels } = require('./lib/read_windows_audio');
 
@@ -8,6 +9,15 @@ const { readWindowsAudioLevels, setWindowsAudioLevels } = require('./lib/read_wi
 if (!app.isPackaged) {
   app.setPath('userData', path.join(app.getAppPath(), '.electron-userdata'));
 }
+
+// Only one copy may run: a second launch just brings the existing widget back
+// (otherwise every launch adds another full set of tray icons).
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+}
+
+/** Added to the login item so a Windows-startup launch can honour "Start hidden". */
+const START_HIDDEN_ARG = '--start-hidden';
 
 let mainWindow = null;
 let windowResizeSession = null;
@@ -115,6 +125,7 @@ function defaultSettings() {
     volumePanelVisible: true,
     deviceVisibility: { headphones: true, keyboard: true, mouse: true },
     deviceTrayIcons: true,
+    startHidden: false,
     windowBounds: null,
   };
 }
@@ -136,12 +147,12 @@ function saveSettings(settings) {
 function applyOpenAtLogin(enabled) {
   try {
     if (app.isPackaged) {
-      app.setLoginItemSettings({ openAtLogin: !!enabled });
+      app.setLoginItemSettings({ openAtLogin: !!enabled, args: [START_HIDDEN_ARG] });
     } else {
       app.setLoginItemSettings({
         openAtLogin: !!enabled,
         path: process.execPath,
-        args: [app.getAppPath()],
+        args: [app.getAppPath(), START_HIDDEN_ARG],
       });
     }
   } catch (e) {
@@ -244,9 +255,17 @@ async function tickDevicesFromMain() {
   pushDevicesToRenderer();
 }
 
-function createWindow() {
+function hideWidget() {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+}
+
+/**
+ * Create the widget window (or show it if it already exists). With `{ show: false }` the window
+ * is still created, just hidden, because its renderer draws the taskbar battery icons.
+ */
+function createWindow({ show = true } = {}) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    showWidgetWithoutStealingFocus();
+    if (show) showWidgetWithoutStealingFocus();
     return;
   }
 
@@ -289,13 +308,15 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (!show || !mainWindow || mainWindow.isDestroyed()) return;
     showWidgetWithoutStealingFocus();
   });
   mainWindow.on('show', () => {
     applyAlwaysOnTopToMainWindow();
     applyWindowMinimumConstraints();
+    updateTrayMenu();
   });
+  mainWindow.on('hide', () => updateTrayMenu());
   mainWindow.webContents.once('did-finish-load', () => {
     pushDevicesToRenderer();
     applyAlwaysOnTopToMainWindow();
@@ -344,6 +365,26 @@ function createWindow() {
   applyWindowMinimumConstraints();
 }
 
+/**
+ * Stable per-icon GUID so Windows remembers each icon's "show in taskbar" choice across restarts.
+ * Unsigned apps have their GUIDs tied to the exe path, so the path is hashed in: dev and installed
+ * builds (or a moved install) get their own GUIDs instead of failing to register the icon.
+ */
+function trayGuid(slot) {
+  const h = crypto.createHash('sha1').update(`${process.execPath.toLowerCase()}|${slot}`).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+function createTrayIcon(image, slot) {
+  if (process.platform !== 'win32') return new Tray(image);
+  try {
+    return new Tray(image, trayGuid(slot));
+  } catch (e) {
+    console.warn(`Tray GUID for ${slot} rejected, falling back:`, e.message);
+    return new Tray(image);
+  }
+}
+
 function createTray() {
   const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
   let icon = null;
@@ -357,7 +398,7 @@ function createTray() {
     }
   } catch (_) {}
   if (!icon || icon.isEmpty()) icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
+  tray = createTrayIcon(icon, 'main');
   tray.setToolTip('Razer Battery Widget');
   tray.on('double-click', () => createWindow());
   updateTrayMenu();
@@ -390,7 +431,7 @@ function setDeviceTypeVisible(typeKey, visible) {
 }
 
 /** Per-device taskbar battery icons (rendered as canvas PNGs by the renderer). */
-const deviceTrays = new Map(); // device handle -> Tray
+const deviceTrays = new Map(); // device type (or handle if unknown) -> Tray
 
 function destroyDeviceTrays() {
   for (const t of deviceTrays.values()) {
@@ -411,6 +452,13 @@ function setTrayIconsEnabled(enabled) {
   pushSettingsToRenderer();
 }
 
+function setStartHidden(enabled) {
+  const settings = loadSettings();
+  settings.startHidden = !!enabled;
+  saveSettings(settings);
+  updateTrayMenu();
+}
+
 /** Native menus always close on click; reopen right away so toggling several devices is quick. */
 function reopenTrayMenu() {
   if (!tray) return;
@@ -426,8 +474,11 @@ function updateTrayMenu() {
   if (!tray) return;
   const settings = loadSettings();
   const vis = settings.deviceVisibility || {};
+  const widgetVisible = !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
   const menu = Menu.buildFromTemplate([
-    { label: 'Show Widget', type: 'normal', click: () => createWindow() },
+    widgetVisible
+      ? { label: 'Hide Widget', type: 'normal', click: () => hideWidget() }
+      : { label: 'Show Widget', type: 'normal', click: () => createWindow() },
     { type: 'separator' },
     { label: 'Devices', enabled: false },
     ...DEVICE_SLOT_TYPES.map(({ key, label }) => ({
@@ -461,6 +512,12 @@ function updateTrayMenu() {
       },
     },
     {
+      label: 'Start hidden (taskbar icons only)',
+      type: 'checkbox',
+      checked: !!settings.startHidden,
+      click: (item) => setStartHidden(item.checked),
+    },
+    {
       label: 'Battery icons in taskbar',
       type: 'checkbox',
       checked: settings.deviceTrayIcons !== false,
@@ -477,9 +534,13 @@ function updateTrayMenu() {
   }
 }
 
+app.on('second-instance', () => createWindow());
+
 app.whenReady().then(() => {
   const settings = loadSettings();
   applyOpenAtLogin(settings.openAtLogin);
+  // Hidden start only applies to the Windows-startup launch; opening the app by hand always shows it.
+  const startHidden = !!settings.startHidden && process.argv.includes(START_HIDDEN_ARG);
 
   screen.on('display-removed', ensureMainWindowOnScreen);
   screen.on('display-metrics-changed', ensureMainWindowOnScreen);
@@ -510,7 +571,7 @@ app.whenReady().then(() => {
   setTimeout(pushAudioLevels, 500);
 
   createTray();
-  createWindow();
+  createWindow({ show: !startHidden });
 
   alwaysOnTopPollTimer = setInterval(() => {
     if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
@@ -587,6 +648,8 @@ ipcMain.handle('quit-app', () => {
   isQuitting = true;
   app.quit();
 });
+ipcMain.handle('hide-widget', () => hideWidget());
+ipcMain.handle('set-start-hidden', (_, value) => setStartHidden(value));
 ipcMain.handle('focus-widget-window', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
 });
@@ -618,12 +681,12 @@ ipcMain.handle('set-tray-battery-icons', (_, list) => {
     } catch (_) {
       continue;
     }
-    const key = String(it.handle);
+    const key = DEVICE_SLOT_TYPES.some((d) => d.key === it.type) ? it.type : String(it.handle);
     seen.add(key);
     let t = deviceTrays.get(key);
     if (!t) {
       try {
-        t = new Tray(icon);
+        t = createTrayIcon(icon, `device:${key}`);
       } catch (_) {
         continue;
       }
