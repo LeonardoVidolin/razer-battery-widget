@@ -195,6 +195,7 @@
       const pct = Math.max(0, Math.min(100, Math.round(Number(d.batteryPercentage) || 0)));
       const charging = !!d.isCharging;
       items.push({
+        type: t.key,
         handle: String(d.handle),
         name: d.name || t.label,
         pct,
@@ -249,8 +250,10 @@
       <div class="context-menu-sep"></div>
       <button type="button" class="context-menu-item" data-menu-action="always-on-top">${check}Always on top</button>
       <button type="button" class="context-menu-item" data-menu-action="open-at-login">${check}Start with Windows</button>
+      <button type="button" class="context-menu-item" data-menu-action="start-hidden">${check}Start hidden (taskbar icons only)</button>
       <button type="button" class="context-menu-item" data-menu-action="tray-icons">${check}Battery icons in taskbar</button>
       <div class="context-menu-sep"></div>
+      <button type="button" class="context-menu-item" data-menu-action="hide"><span class="context-menu-check"></span>Hide widget</button>
       <button type="button" class="context-menu-item" data-menu-action="quit"><span class="context-menu-check"></span>Quit</button>
     `;
     document.body.appendChild(el);
@@ -269,13 +272,19 @@
         return; // keep the menu open for more toggles
       }
       const action = item.dataset.menuAction;
-      if (action === 'always-on-top' || action === 'open-at-login' || action === 'tray-icons') {
+      if (action === 'always-on-top' || action === 'open-at-login' || action === 'tray-icons' || action === 'start-hidden') {
         const next = !item.classList.contains('checked');
         item.classList.toggle('checked', next);
         if (action === 'always-on-top' && typeof api.setAlwaysOnTop === 'function') api.setAlwaysOnTop(next);
         if (action === 'open-at-login' && typeof api.setOpenAtLogin === 'function') api.setOpenAtLogin(next);
         if (action === 'tray-icons' && typeof api.setTrayIconsEnabled === 'function') api.setTrayIconsEnabled(next);
+        if (action === 'start-hidden' && typeof api.setStartHidden === 'function') api.setStartHidden(next);
         return; // keep the menu open
+      }
+      if (action === 'hide') {
+        closeContextMenu();
+        if (typeof api.hideWidget === 'function') api.hideWidget();
+        return;
       }
       if (action === 'quit') {
         closeContextMenu();
@@ -293,9 +302,11 @@
     const aot = el.querySelector('[data-menu-action="always-on-top"]');
     const oal = el.querySelector('[data-menu-action="open-at-login"]');
     const tico = el.querySelector('[data-menu-action="tray-icons"]');
+    const shid = el.querySelector('[data-menu-action="start-hidden"]');
     if (aot) aot.classList.toggle('checked', !settings || settings.alwaysOnTop !== false);
     if (oal) oal.classList.toggle('checked', !settings || settings.openAtLogin !== false);
     if (tico) tico.classList.toggle('checked', !settings || settings.deviceTrayIcons !== false);
+    if (shid) shid.classList.toggle('checked', !!(settings && settings.startHidden));
     el.hidden = false;
     // Suspend the window drag region while open so any click inside the widget reaches
     // the page (and closes the menu) instead of starting a window drag.
@@ -340,6 +351,15 @@
     if (e.key === 'Escape') closeContextMenu();
   });
   window.addEventListener('blur', closeContextMenu);
+
+  const hideBtn = document.getElementById('hide-btn');
+  if (hideBtn && window.electronAPI && typeof window.electronAPI.hideWidget === 'function') {
+    hideBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.electronAPI.hideWidget();
+    });
+  }
 
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn && window.electronAPI && typeof window.electronAPI.refreshDevices === 'function') {

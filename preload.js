@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setAlwaysOnTop: (value) => ipcRenderer.invoke('set-always-on-top', value),
   setOpenAtLogin: (value) => ipcRenderer.invoke('set-open-at-login', value),
   quitApp: () => ipcRenderer.invoke('quit-app'),
+  hideWidget: () => ipcRenderer.invoke('hide-widget'),
+  setStartHidden: (value) => ipcRenderer.invoke('set-start-hidden', value),
   focusWindow: () => ipcRenderer.invoke('focus-widget-window'),
   setTrayBatteryIcons: (list) => ipcRenderer.invoke('set-tray-battery-icons', list),
   setTrayIconsEnabled: (value) => ipcRenderer.invoke('set-tray-icons-enabled', value),

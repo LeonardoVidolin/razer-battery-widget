@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.5.0] — 2026-10-09
+
+### Added
+
+- **Hide widget** — a "–" button on the widget (borderless in the top corners when the widget is small, so it never covers the battery rings), a "Hide widget" item in its right-click menu, and a Hide/Show Widget toggle in the tray menu. The battery icons stay in the taskbar while the widget is hidden; Quit still exits completely.
+- **Start hidden (taskbar icons only)** — new option in both menus. When the app is launched by "Start with Windows", it starts with only the taskbar icons; opening it by hand always shows the widget.
+
+### Fixed
+
+- **Duplicate tray icons** — launching the app a second time started another copy with its own set of icons. Only one copy runs now; a second launch brings the existing widget back.
+- **Taskbar icon visibility not remembered** — tray icons now have stable IDs per device type, so Windows 11 can remember to keep them shown in the taskbar (not hidden behind ^) after a restart.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.5.0.exe`.
+
 ## [1.4.2] — 2026-10-03
 
 ### Fixed
