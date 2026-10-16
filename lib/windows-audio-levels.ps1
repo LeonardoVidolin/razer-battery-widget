@@ -1,8 +1,12 @@
 # Read/set default Windows playback + capture master level (Core Audio API).
 # Based on Stack Overflow Core Audio interop (CC BY-SA).
+# With -Serve it stays running and answers one request per stdin line
+# ("<playbackPct> <capturePct>", -1 = leave unchanged) with one JSON line, so the
+# C# below is compiled once instead of on every poll.
 param(
   [int]$PlaybackPct = -1,
-  [int]$CapturePct = -1
+  [int]$CapturePct = -1,
+  [switch]$Serve
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,31 +76,50 @@ public class RbwAudioIn {
 }
 '@
 
-if ($PlaybackPct -ge 0 -and $PlaybackPct -le 100) {
+function Invoke-AudioLevels([int]$PlaybackPct, [int]$CapturePct) {
+  if ($PlaybackPct -ge 0 -and $PlaybackPct -le 100) {
+    try {
+      [RbwAudioOut]::Volume = [float]($PlaybackPct / 100.0)
+      if ($PlaybackPct -gt 0) { [RbwAudioOut]::Mute = $false }
+    } catch { }
+  }
+  if ($CapturePct -ge 0 -and $CapturePct -le 100) {
+    try {
+      [RbwAudioIn]::Volume = [float]($CapturePct / 100.0)
+      if ($CapturePct -gt 0) { [RbwAudioIn]::Mute = $false }
+    } catch { }
+  }
+
+  $outL = 0.0; $outM = $true; $inL = 0.0; $inM = $true
   try {
-    [RbwAudioOut]::Volume = [float]($PlaybackPct / 100.0)
-    if ($PlaybackPct -gt 0) { [RbwAudioOut]::Mute = $false }
+    $outL = [double][RbwAudioOut]::Volume
+    $outM = [bool][RbwAudioOut]::Mute
   } catch { }
-}
-if ($CapturePct -ge 0 -and $CapturePct -le 100) {
   try {
-    [RbwAudioIn]::Volume = [float]($CapturePct / 100.0)
-    if ($CapturePct -gt 0) { [RbwAudioIn]::Mute = $false }
+    $inL = [double][RbwAudioIn]::Volume
+    $inM = [bool][RbwAudioIn]::Mute
   } catch { }
+
+  $obj = [PSCustomObject]@{
+    playback = @{ level = $outL; mute = $outM }
+    capture  = @{ level = $inL; mute = $inM }
+  }
+  return ($obj | ConvertTo-Json -Compress)
 }
 
-$outL = 0.0; $outM = $true; $inL = 0.0; $inM = $true
-try {
-  $outL = [double][RbwAudioOut]::Volume
-  $outM = [bool][RbwAudioOut]::Mute
-} catch { }
-try {
-  $inL = [double][RbwAudioIn]::Volume
-  $inM = [bool][RbwAudioIn]::Mute
-} catch { }
-
-$obj = [PSCustomObject]@{
-  playback = @{ level = $outL; mute = $outM }
-  capture  = @{ level = $inL; mute = $inM }
+if (-not $Serve) {
+  Invoke-AudioLevels $PlaybackPct $CapturePct
+  return
 }
-$obj | ConvertTo-Json -Compress
+
+$stdin = [Console]::In
+while ($true) {
+  $line = $stdin.ReadLine()
+  if ($null -eq $line) { break } # parent closed stdin: exit
+  $parts = $line.Trim() -split '\s+'
+  $p = -1; $c = -1
+  if ($parts.Length -ge 1) { [void][int]::TryParse($parts[0], [ref]$p) }
+  if ($parts.Length -ge 2) { [void][int]::TryParse($parts[1], [ref]$c) }
+  [Console]::Out.WriteLine((Invoke-AudioLevels $p $c))
+  [Console]::Out.Flush()
+}
