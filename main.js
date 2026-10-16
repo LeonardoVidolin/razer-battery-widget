@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { RazerWatcher } = require('./watcher/razer_watcher');
-const { readWindowsAudioLevels, setWindowsAudioLevels } = require('./lib/read_windows_audio');
+const { readWindowsAudioLevels, setWindowsAudioLevels, shutdownAudioWorker } = require('./lib/read_windows_audio');
 
 // Use a local userData folder in dev so cache/settings aren't blocked (e.g. "Access is denied")
 if (!app.isPackaged) {
@@ -248,6 +248,27 @@ function pushDevicesToRenderer() {
   }
 }
 
+let audioLevelsInFlight = false;
+
+/** Poll Windows volume for the panel; skipped while nobody can see it (widget hidden or panel closed). */
+async function pushAudioLevels() {
+  if (isQuitting || audioLevelsInFlight) return;
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
+  if (loadSettings().volumePanelVisible === false) return;
+  audioLevelsInFlight = true;
+  try {
+    const levels = await readWindowsAudioLevels(app);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('audio-levels-update', levels);
+    }
+  } finally {
+    audioLevelsInFlight = false;
+  }
+}
+
+/** Last time the widget moved; Z-order re-apply waits until a drag is over. */
+let lastWindowMoveAt = 0;
+
 async function tickDevicesFromMain() {
   if (!razerWatcher || isQuitting) return;
   try {
@@ -318,6 +339,7 @@ function createWindow({ show = true } = {}) {
     applyAlwaysOnTopToMainWindow();
     applyWindowMinimumConstraints();
     updateTrayMenu();
+    pushAudioLevels();
   });
   mainWindow.on('hide', () => updateTrayMenu());
   mainWindow.webContents.once('did-finish-load', () => {
@@ -363,7 +385,10 @@ function createWindow({ show = true } = {}) {
     }, 450);
   }
   mainWindow.on('resize', scheduleSaveWindowBounds);
-  mainWindow.on('move', scheduleSaveWindowBounds);
+  mainWindow.on('move', () => {
+    lastWindowMoveAt = Date.now();
+    scheduleSaveWindowBounds();
+  });
 
   applyWindowMinimumConstraints();
 }
@@ -580,11 +605,6 @@ app.whenReady().then(() => {
   devicesPushTimer = setInterval(tickDevicesFromMain, DEVICES_POLL_MS);
   setTimeout(tickDevicesFromMain, 2500);
 
-  function pushAudioLevels() {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    const levels = readWindowsAudioLevels(app);
-    mainWindow.webContents.send('audio-levels-update', levels);
-  }
   audioLevelsTimer = setInterval(pushAudioLevels, AUDIO_LEVELS_POLL_MS);
   setTimeout(pushAudioLevels, 500);
 
@@ -594,6 +614,8 @@ app.whenReady().then(() => {
   alwaysOnTopPollTimer = setInterval(() => {
     if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
     if (!loadSettings().alwaysOnTop) return;
+    // Changing Z-order mid-drag makes the window hitch; it is re-applied once the drag stops.
+    if (Date.now() - lastWindowMoveAt < 1000) return;
     applyAlwaysOnTopToMainWindow();
   }, ALWAYS_ON_TOP_REAPPLY_MS);
 });
@@ -623,6 +645,7 @@ app.on('before-quit', () => {
     clearInterval(alwaysOnTopPollTimer);
     alwaysOnTopPollTimer = null;
   }
+  shutdownAudioWorker();
   destroyDeviceTrays();
   if (tray) try { tray.destroy(); tray = null; } catch (_) {}
   if (razerWatcher) razerWatcher.stop();
@@ -632,14 +655,14 @@ app.on('before-quit', () => {
 });
 
 ipcMain.handle('get-audio-levels', () => readWindowsAudioLevels(app));
-ipcMain.handle('set-audio-levels', (_, payload) => {
+ipcMain.handle('set-audio-levels', async (_, payload) => {
   const playbackPct =
     payload && Number.isFinite(payload.playback) ? Math.max(0, Math.min(100, Math.round(payload.playback))) : -1;
   const capturePct =
     payload && Number.isFinite(payload.capture) ? Math.max(0, Math.min(100, Math.round(payload.capture))) : -1;
   if (playbackPct < 0 && capturePct < 0) return readWindowsAudioLevels(app);
-  const result = setWindowsAudioLevels(app, { playbackPct, capturePct });
-  const out = result ?? readWindowsAudioLevels(app);
+  const result = await setWindowsAudioLevels(app, { playbackPct, capturePct });
+  const out = result ?? (await readWindowsAudioLevels(app));
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('audio-levels-update', out);
   }
@@ -739,6 +762,8 @@ ipcMain.handle('set-volume-panel-visible', (_, value) => {
   settings.volumePanelVisible = !!value;
   saveSettings(settings);
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  // Polling pauses while the panel is closed, so fetch fresh levels when it opens.
+  if (value) pushAudioLevels();
   const before = mainWindow.getBounds();
   applyWindowMinimumConstraints();
   if (value) {
