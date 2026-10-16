@@ -1,8 +1,11 @@
 (function () {
-  // Mouse and keyboard before headphones so names like "Lancehead" never match headset patterns
+  // Mouse, keyboard, speaker and controller before headphones so names like "Lancehead"
+  // or "Clio HyperSpeed" never match headset patterns.
   const DEVICE_TYPES = [
     { key: 'mouse', label: 'Mouse', keywords: /mouse|deathadder|viper|basilisk|mamba|naga|lancehead|ouroboros|orochi|cobra|pro click|davinci|hyperflux/i },
     { key: 'keyboard', label: 'Keyboard', keywords: /keyboard|blackwidow|huntsman|ornata|cynosa|deathstalker|keypad/i },
+    { key: 'speaker', label: 'Speaker', keywords: /speaker|clio|nommo|leviathan|soundbar/i },
+    { key: 'controller', label: 'Controller', keywords: /controller|gamepad|wolverine|kishi|raiju|kitsune/i },
     {
       key: 'headphones',
       label: 'Headphones',
@@ -10,12 +13,48 @@
     },
   ];
 
+  /** The three fixed slots the widget always shows (placeholder when nothing is connected). */
+  const SLOT_TYPES = ['headphones', 'keyboard', 'mouse'];
+
+  /** Every icon a device can be shown with; "other" is the fallback for unrecognised names. */
+  const ICON_TYPES = [
+    ...DEVICE_TYPES.map((t) => ({ key: t.key, label: t.label })),
+    { key: 'other', label: 'Other device' },
+  ];
+  const ICON_MENU_ORDER = ['headphones', 'keyboard', 'mouse', 'speaker', 'controller', 'other'];
+
+  function typeLabel(key) {
+    const t = ICON_TYPES.find((x) => x.key === key);
+    return t ? t.label : 'Device';
+  }
+
   function getDeviceType(name) {
     if (!name) return null;
     for (const t of DEVICE_TYPES) {
       if (t.keywords.test(name)) return t.key;
     }
     return null;
+  }
+
+  /** Per-device choices from the right-click menu, keyed by lowercase device name. */
+  let deviceOverrides = {};
+
+  function deviceKey(d) {
+    return String((d && d.name) || '').trim().toLowerCase();
+  }
+
+  function isDeviceHidden(d) {
+    return deviceOverrides[deviceKey(d)] === 'hidden';
+  }
+
+  function resolveDeviceType(d) {
+    const ov = deviceOverrides[deviceKey(d)];
+    if (ov && ICON_TYPES.some((t) => t.key === ov)) return ov;
+    return getDeviceType(d.name) || 'other';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   }
 
   function preferBetterBatteryReading(a, b) {
@@ -27,36 +66,37 @@
     return String(a.handle) < String(b.handle) ? a : b;
   }
 
-  /** Assign devices to slots by type; fill remaining visible slots with unmatched devices so nothing is hidden. */
-  function pickDevicesByType(devices, visibility) {
-    const byType = { headphones: null, keyboard: null, mouse: null };
-    const assigned = new Set();
-    for (const t of DEVICE_TYPES) {
-      const candidates = devices.filter((d) => getDeviceType(d.name) === t.key);
+  /**
+   * Put the best device of each slot type in its slot; every other visible device (speakers,
+   * controllers, unrecognised names, a second mouse...) gets its own card after the slots.
+   * Devices hidden from the menu, and devices of a hidden slot type, are left out.
+   */
+  function pickDevices(devices, visibility) {
+    const slots = { headphones: null, keyboard: null, mouse: null };
+    const extras = [];
+    const shown = devices.filter((d) => !isDeviceHidden(d));
+    for (const key of SLOT_TYPES) {
+      const candidates = shown.filter((d) => resolveDeviceType(d) === key);
       if (candidates.length === 0) continue;
-      const best =
-        candidates.length === 1 ? candidates[0] : candidates.reduce(preferBetterBatteryReading);
-      byType[t.key] = best;
-      assigned.add(best.handle);
+      slots[key] = candidates.length === 1 ? candidates[0] : candidates.reduce(preferBetterBatteryReading);
     }
-    const slots = ['headphones', 'keyboard', 'mouse'].filter(
-      (s) => !visibility || visibility[s] !== false
-    );
-    for (const d of devices) {
-      if (assigned.has(d.handle)) continue;
-      const empty = slots.find((s) => byType[s] === null);
-      if (empty) {
-        byType[empty] = d;
-        assigned.add(d.handle);
+    for (const d of shown) {
+      const type = resolveDeviceType(d);
+      if (SLOT_TYPES.includes(type)) {
+        if (slots[type] === d || (visibility && visibility[type] === false)) continue;
       }
+      extras.push({ type, device: d });
     }
-    return byType;
+    return { slots, extras };
   }
 
   const ICONS = {
     headphones: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>`,
     keyboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h.01M12 14h.01M16 14h.01M7 18h10"/></svg>`,
     mouse: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="7"/><path d="M12 6v6"/></svg>`,
+    speaker: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><path d="M12 6h.01"/></svg>`,
+    controller: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59l-.9 7.82A2.4 2.4 0 0 0 4.18 19c.86 0 1.66-.46 2.08-1.21L7.5 16h9l1.24 1.79A2.4 2.4 0 0 0 19.82 19a2.4 2.4 0 0 0 2.38-2.59l-.9-7.82A4 4 0 0 0 17.32 5z"/></svg>`,
+    other: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 10v4M10 10v4"/></svg>`,
   };
 
   const LIGHTNING = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`;
@@ -70,14 +110,18 @@
     return '';
   }
 
-  function renderDevice(type, device, label) {
+  function renderDevice(type, device, isSlot) {
     const icon = ICONS[type] || '';
     const pct = device ? device.batteryPercentage : 0;
     const offset = C - (pct / 100) * C;
     const charging = device && device.isCharging;
     const fillClass = device ? ringClass(pct) : '';
+    const title = device
+      ? `${escapeHtml(device.name || typeLabel(type))} — right-click to change icon or hide`
+      : `${typeLabel(type)} — right-click to hide`;
+    const deviceAttr = device ? ` data-device="${escapeHtml(deviceKey(device))}"` : '';
     return `
-      <div class="device ${device ? '' : 'empty-slot'}" data-type="${type}" title="${label} — right-click to hide">
+      <div class="device ${device ? '' : 'empty-slot'}" data-type="${type}"${isSlot ? ' data-slot="1"' : ''}${deviceAttr} title="${title}">
         <div class="device-slot">
           <svg class="ring" viewBox="0 0 76 76">
             <circle class="ring-bg" cx="38" cy="38" r="${R}"/>
@@ -110,7 +154,7 @@
 
   // Device glyphs (same SVGs as the widget) pre-loaded as images for the tray icon canvas.
   const TRAY_GLYPHS = {};
-  for (const t of DEVICE_TYPES) {
+  for (const t of ICON_TYPES) {
     const svg = ICONS[t.key];
     if (!svg) continue;
     const xml = svg.replace(
@@ -185,22 +229,29 @@
     return c.toDataURL('image/png');
   }
 
-  function sendTrayBatteryIcons(byType) {
+  function sendTrayBatteryIcons(picked) {
     if (!window.electronAPI || typeof window.electronAPI.setTrayBatteryIcons !== 'function') return;
+    const entries = [
+      ...SLOT_TYPES.filter((k) => deviceVisibility[k] !== false).map((k) => ({
+        type: k,
+        device: picked.slots[k],
+        slot: true,
+      })),
+      ...picked.extras.map((e) => ({ ...e, slot: false })),
+    ];
     const items = [];
-    for (const t of DEVICE_TYPES) {
-      if (deviceVisibility[t.key] === false) continue;
-      const d = byType[t.key];
+    for (const { type, device: d, slot } of entries) {
       if (!d || d.handle == null) continue;
       const pct = Math.max(0, Math.min(100, Math.round(Number(d.batteryPercentage) || 0)));
       const charging = !!d.isCharging;
       items.push({
-        type: t.key,
+        type,
+        slot,
         handle: String(d.handle),
-        name: d.name || t.label,
+        name: d.name || typeLabel(type),
         pct,
         charging,
-        dataURL: drawTrayIconDataURL(pct, charging, t.key),
+        dataURL: drawTrayIconDataURL(pct, charging, type),
       });
     }
     window.electronAPI.setTrayBatteryIcons(items);
@@ -208,12 +259,39 @@
 
   function render(devices) {
     if (Array.isArray(devices)) lastDevices = devices;
-    const byType = pickDevicesByType(lastDevices, deviceVisibility);
+    const picked = pickDevices(lastDevices, deviceVisibility);
     const container = document.getElementById('devices');
-    container.innerHTML = DEVICE_TYPES.filter((t) => deviceVisibility[t.key] !== false)
-      .map((t) => renderDevice(t.key, byType[t.key], t.label))
-      .join('');
-    sendTrayBatteryIcons(byType);
+    container.innerHTML =
+      SLOT_TYPES.filter((k) => deviceVisibility[k] !== false)
+        .map((k) => renderDevice(k, picked.slots[k], true))
+        .join('') + picked.extras.map((e) => renderDevice(e.type, e.device, false)).join('');
+    sendTrayBatteryIcons(picked);
+  }
+
+  function setDeviceOverride(key, value) {
+    if (!key) return;
+    const next = { ...deviceOverrides };
+    if (!value || value === 'auto') delete next[key];
+    else next[key] = value;
+    deviceOverrides = next;
+    render(lastDevices);
+    if (window.electronAPI && typeof window.electronAPI.setDeviceOverride === 'function') {
+      window.electronAPI.setDeviceOverride(key, value || null);
+    }
+  }
+
+  function normalizeDeviceOverrides(v) {
+    const out = {};
+    if (!v || typeof v !== 'object') return out;
+    for (const [k, val] of Object.entries(v)) {
+      if (val === 'hidden' || ICON_TYPES.some((t) => t.key === val)) out[k] = val;
+    }
+    return out;
+  }
+
+  function applySettings(s) {
+    deviceVisibility = normalizeDeviceVisibility(s && s.deviceVisibility);
+    deviceOverrides = normalizeDeviceOverrides(s && s.deviceOverrides);
   }
 
   function setDeviceTypeVisible(type, visible) {
@@ -227,11 +305,87 @@
   // In-app context menu (right-click outside a device): same items as the tray menu.
   // Checkbox items keep the menu open so several devices can be toggled in one go.
   const CONTEXT_MENU_ID = 'context-menu';
+  const DEVICE_MENU_ID = 'device-menu';
 
   function closeContextMenu() {
-    const el = document.getElementById(CONTEXT_MENU_ID);
-    if (el) el.hidden = true;
+    for (const id of [CONTEXT_MENU_ID, DEVICE_MENU_ID]) {
+      const el = document.getElementById(id);
+      if (el) el.hidden = true;
+    }
     document.body.classList.remove('context-menu-open');
+  }
+
+  function isInsideMenu(target) {
+    return [CONTEXT_MENU_ID, DEVICE_MENU_ID].some((id) => {
+      const el = document.getElementById(id);
+      return el && !el.hidden && el.contains(target);
+    });
+  }
+
+  /** Show a menu element at (x, y), kept inside the window, with the drag region suspended. */
+  function showMenuAt(el, x, y) {
+    el.hidden = false;
+    // Suspend the window drag region while open so any click inside the widget reaches
+    // the page (and closes the menu) instead of starting a window drag.
+    document.body.classList.add('context-menu-open');
+    const r = el.getBoundingClientRect();
+    el.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+    el.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+    // Take focus so a click outside the app blurs the window and closes the menu.
+    if (window.electronAPI && typeof window.electronAPI.focusWindow === 'function') {
+      window.electronAPI.focusWindow();
+    }
+  }
+
+  function deviceDisplayName(key) {
+    const d = lastDevices.find((x) => deviceKey(x) === key);
+    return (d && d.name) || key;
+  }
+
+  /** Per-device menu: pick which icon (and slot) a device uses, or hide it. */
+  function openDeviceMenu(key, x, y) {
+    let el = document.getElementById(DEVICE_MENU_ID);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = DEVICE_MENU_ID;
+      el.className = 'context-menu';
+      el.hidden = true;
+      document.body.appendChild(el);
+      el.addEventListener('click', (e) => {
+        const item = e.target.closest('.context-menu-item');
+        if (!item) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const k = el.dataset.deviceKey;
+        const value = item.dataset.menuIcon;
+        if (value) {
+          setDeviceOverride(k, value);
+          el.querySelectorAll('[data-menu-icon]').forEach((b) => b.classList.toggle('checked', b === item));
+          return; // keep the menu open so the result can be seen before closing
+        }
+        if (item.dataset.menuAction === 'hide-device') {
+          closeContextMenu();
+          setDeviceOverride(k, 'hidden');
+        }
+      });
+    }
+    el.dataset.deviceKey = key;
+    const ov = deviceOverrides[key];
+    const current = ov && ov !== 'hidden' ? ov : 'auto';
+    const d = lastDevices.find((x) => deviceKey(x) === key);
+    const detected = d ? getDeviceType(d.name) : null;
+    const check = '<span class="context-menu-check">✓</span>';
+    const item = (value, label) =>
+      `<button type="button" class="context-menu-item${current === value ? ' checked' : ''}" data-menu-icon="${value}">${check}${label}</button>`;
+    el.innerHTML = `
+      <div class="context-menu-header context-menu-title">${escapeHtml(deviceDisplayName(key))}</div>
+      <div class="context-menu-header">Show as</div>
+      ${item('auto', `Auto-detect (${typeLabel(detected || 'other')})`)}
+      ${ICON_MENU_ORDER.map((k) => item(k, typeLabel(k))).join('')}
+      <div class="context-menu-sep"></div>
+      <button type="button" class="context-menu-item" data-menu-action="hide-device"><span class="context-menu-check"></span>Hide this device</button>
+    `;
+    showMenuAt(el, x, y);
   }
 
   function ensureContextMenu() {
@@ -244,9 +398,10 @@
     const check = '<span class="context-menu-check">✓</span>';
     el.innerHTML = `
       <div class="context-menu-header">Devices</div>
-      ${DEVICE_TYPES.map(
-        (t) => `<button type="button" class="context-menu-item" data-menu-device="${t.key}">${check}${t.label}</button>`
+      ${SLOT_TYPES.map(
+        (k) => `<button type="button" class="context-menu-item" data-menu-device="${k}">${check}${typeLabel(k)}</button>`
       ).join('')}
+      <div data-hidden-devices></div>
       <div class="context-menu-sep"></div>
       <button type="button" class="context-menu-item" data-menu-action="always-on-top">${check}Always on top</button>
       <button type="button" class="context-menu-item" data-menu-action="open-at-login">${check}Start with Windows</button>
@@ -264,6 +419,14 @@
       e.preventDefault();
       e.stopPropagation();
       const api = window.electronAPI || {};
+      const unhide = item.dataset.menuUnhide;
+      if (unhide) {
+        setDeviceOverride(unhide, null);
+        item.remove();
+        const list = el.querySelector('[data-hidden-devices]');
+        if (list && !list.querySelector('.context-menu-item')) list.innerHTML = '';
+        return; // keep the menu open for more toggles
+      }
       const devType = item.dataset.menuDevice;
       if (devType) {
         const next = deviceVisibility[devType] === false;
@@ -307,17 +470,22 @@
     if (oal) oal.classList.toggle('checked', !settings || settings.openAtLogin !== false);
     if (tico) tico.classList.toggle('checked', !settings || settings.deviceTrayIcons !== false);
     if (shid) shid.classList.toggle('checked', !!(settings && settings.startHidden));
-    el.hidden = false;
-    // Suspend the window drag region while open so any click inside the widget reaches
-    // the page (and closes the menu) instead of starting a window drag.
-    document.body.classList.add('context-menu-open');
-    const r = el.getBoundingClientRect();
-    el.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
-    el.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
-    // Take focus so a click outside the app blurs the window and closes the menu.
-    if (window.electronAPI && typeof window.electronAPI.focusWindow === 'function') {
-      window.electronAPI.focusWindow();
+    // Devices hidden with "Hide this device" are listed here so they can be brought back.
+    const hiddenList = el.querySelector('[data-hidden-devices]');
+    if (hiddenList) {
+      const hiddenKeys = Object.keys(deviceOverrides).filter((k) => deviceOverrides[k] === 'hidden');
+      hiddenList.innerHTML = hiddenKeys.length
+        ? `<div class="context-menu-sep"></div><div class="context-menu-header">Hidden devices</div>` +
+          hiddenKeys
+            .map(
+              (k) =>
+                `<button type="button" class="context-menu-item" data-menu-unhide="${escapeHtml(k)}"><span class="context-menu-check"></span>Show ${escapeHtml(deviceDisplayName(k))}</button>`
+            )
+            .join('')
+        : '';
     }
+    closeContextMenu();
+    showMenuAt(el, x, y);
   }
 
   function requestContextMenuAt(x, y) {
@@ -331,11 +499,16 @@
 
   document.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    const menuEl = document.getElementById(CONTEXT_MENU_ID);
-    if (menuEl && !menuEl.hidden && menuEl.contains(e.target)) return;
+    if (isInsideMenu(e.target)) return;
     const dev = e.target.closest('.device');
-    if (dev && dev.dataset.type) {
-      // Right-click on a device still hides just that device.
+    if (dev && dev.dataset.device) {
+      // Right-click on a connected device: change its icon or hide it.
+      closeContextMenu();
+      openDeviceMenu(dev.dataset.device, e.clientX, e.clientY);
+      return;
+    }
+    if (dev && dev.dataset.slot) {
+      // Right-click on an empty slot hides that slot.
       closeContextMenu();
       setDeviceTypeVisible(dev.dataset.type, false);
       return;
@@ -344,8 +517,7 @@
   });
 
   document.addEventListener('mousedown', (e) => {
-    const el = document.getElementById(CONTEXT_MENU_ID);
-    if (el && !el.hidden && !el.contains(e.target)) closeContextMenu();
+    if (!isInsideMenu(e.target)) closeContextMenu();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeContextMenu();
@@ -583,7 +755,7 @@
       window.electronAPI
         .getSettings()
         .then((s) => {
-          deviceVisibility = normalizeDeviceVisibility(s && s.deviceVisibility);
+          applySettings(s);
           applyVolumePanelVisible(s && s.volumePanelVisible !== false);
           render(lastDevices);
         })
@@ -594,7 +766,7 @@
 
     if (typeof window.electronAPI.onSettingsUpdate === 'function') {
       window.electronAPI.onSettingsUpdate((s) => {
-        deviceVisibility = normalizeDeviceVisibility(s && s.deviceVisibility);
+        applySettings(s);
         render(lastDevices);
       });
     }

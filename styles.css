@@ -508,6 +508,17 @@ body.context-menu-open .widget {
   color: rgba(0, 255, 0, 0.45);
 }
 
+.context-menu-title {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #00ff00;
+}
+
 .context-menu-item {
   display: flex;
   align-items: center;
