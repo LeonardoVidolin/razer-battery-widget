@@ -1,10 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [1.6.1] — 2026-10-16
 
 ### Fixed
 
 - **Choppy dragging** — every 2 seconds the widget started a new PowerShell to read the volume and waited for it (~1.3 s each), freezing the app and making the window stutter while being dragged. A single PowerShell now stays open and answers in a few milliseconds without blocking. Volume polling also pauses while the volume panel is closed or the widget is hidden, and "always on top" is no longer re-applied in the middle of a drag.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.6.1.exe`.
 
 ## [1.6.0] — 2026-10-16
 
