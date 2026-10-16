@@ -60,7 +60,15 @@ Devices are detected automatically from Synapse. Typical matches:
 | Keyboard   | BlackWidow, Huntsman, Ornata, Cynosa, DeathStalker                        |
 | Mouse      | DeathAdder, Viper, Basilisk, Mamba, Naga, Orochi, Cobra, Pro Click       |
 
-If a device doesn’t appear, it may use a name that isn’t mapped yet; the widget still shows up to three devices, filling slots in order when the exact type isn’t recognized.
+| Speaker    | Clio, Nommo, Leviathan                                                   |
+| Controller | Wolverine, Kishi, Raiju                                                  |
+
+Headphones, keyboard and mouse are the three fixed slots. Speakers, controllers, unrecognized devices (shown with a generic battery icon) and any second device of the same type get their own card next to them.
+
+**Wrong icon or a device you don’t want?** Right-click the device in the widget:
+
+- **Show as** — pick Headphones, Keyboard, Mouse, Speaker, Controller or Other device (or go back to Auto-detect). The choice is remembered per device name.
+- **Hide this device** — removes it from the widget and the taskbar. Hidden devices are listed at the bottom of the widget’s right-click menu (on the background) under **Hidden devices**, where you can show them again.
 
 ---
 

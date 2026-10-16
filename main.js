@@ -112,6 +112,7 @@ function loadSettings() {
       ...defaults,
       ...parsed,
       deviceVisibility: { ...defaults.deviceVisibility, ...(parsed.deviceVisibility || {}) },
+      deviceOverrides: { ...(parsed.deviceOverrides || {}) },
     };
   } catch (_) {
     return defaultSettings();
@@ -124,6 +125,8 @@ function defaultSettings() {
     alwaysOnTop: true,
     volumePanelVisible: true,
     deviceVisibility: { headphones: true, keyboard: true, mouse: true },
+    /** Per-device icon choice or "hidden", keyed by lowercase device name (absent = auto-detect). */
+    deviceOverrides: {},
     deviceTrayIcons: true,
     startHidden: false,
     windowBounds: null,
@@ -430,6 +433,21 @@ function setDeviceTypeVisible(typeKey, visible) {
   return settings;
 }
 
+const DEVICE_OVERRIDE_VALUES = ['headphones', 'keyboard', 'mouse', 'speaker', 'controller', 'other', 'hidden'];
+
+function setDeviceOverride(name, value) {
+  const key = String(name || '').trim().toLowerCase().slice(0, 200);
+  const settings = loadSettings();
+  if (!key) return settings;
+  const overrides = { ...settings.deviceOverrides };
+  if (DEVICE_OVERRIDE_VALUES.includes(value)) overrides[key] = value;
+  else delete overrides[key];
+  settings.deviceOverrides = overrides;
+  saveSettings(settings);
+  pushSettingsToRenderer();
+  return settings;
+}
+
 /** Per-device taskbar battery icons (rendered as canvas PNGs by the renderer). */
 const deviceTrays = new Map(); // device type (or handle if unknown) -> Tray
 
@@ -681,7 +699,8 @@ ipcMain.handle('set-tray-battery-icons', (_, list) => {
     } catch (_) {
       continue;
     }
-    const key = DEVICE_SLOT_TYPES.some((d) => d.key === it.type) ? it.type : String(it.handle);
+    // Slot devices keep a per-type key (stable tray GUID); extra cards are keyed by device.
+    const key = it.slot && DEVICE_SLOT_TYPES.some((d) => d.key === it.type) ? it.type : String(it.handle);
     seen.add(key);
     let t = deviceTrays.get(key);
     if (!t) {
@@ -739,6 +758,10 @@ ipcMain.handle('set-device-visibility', (_, payload) => {
   if (!DEVICE_SLOT_TYPES.some((t) => t.key === typeKey)) return loadSettings();
   return setDeviceTypeVisible(typeKey, payload.visible);
 });
+
+ipcMain.handle('set-device-override', (_, payload) =>
+  setDeviceOverride(payload && payload.name, payload && payload.value)
+);
 
 ipcMain.on('window-resize-start', (event, edge) => {
   const win = BrowserWindow.fromWebContents(event.sender);

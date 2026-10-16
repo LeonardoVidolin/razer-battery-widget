@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Change a device’s icon** — right-click a device in the widget → **Show as** Headphones, Keyboard, Mouse, Speaker, Controller or Other device, or Auto-detect. Remembered per device.
+- **Hide a single device** — right-click a device → **Hide this device** (e.g. a wired keyboard Synapse reports as always 100%). Bring it back from **Hidden devices** in the widget’s background right-click menu.
+- **Speaker and controller icons** — Clio, Nommo and Leviathan are detected as speakers; Wolverine, Kishi and Raiju as controllers.
+
+### Changed
+
+- Unrecognized devices no longer take over an empty headphones/keyboard/mouse slot (which showed them with the wrong icon); they get their own card with a generic battery icon. A second device of the same type also gets its own card instead of being dropped.
+
 ## [1.5.0] — 2026-10-09
 
 ### Added

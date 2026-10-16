@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setVolumePanelVisible: (visible) => ipcRenderer.invoke('set-volume-panel-visible', visible),
   setDeviceVisibility: (type, visible) =>
     ipcRenderer.invoke('set-device-visibility', { type, visible }),
+  setDeviceOverride: (name, value) =>
+    ipcRenderer.invoke('set-device-override', { name, value }),
   setAlwaysOnTop: (value) => ipcRenderer.invoke('set-always-on-top', value),
   setOpenAtLogin: (value) => ipcRenderer.invoke('set-open-at-login', value),
   quitApp: () => ipcRenderer.invoke('quit-app'),
