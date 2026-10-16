@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.6.0] — 2026-10-16
 
 ### Added
 
@@ -11,6 +11,10 @@
 ### Changed
 
 - Unrecognized devices no longer take over an empty headphones/keyboard/mouse slot (which showed them with the wrong icon); they get their own card with a generic battery icon. A second device of the same type also gets its own card instead of being dropped.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.6.0.exe`.
 
 ## [1.5.0] — 2026-10-09
 
