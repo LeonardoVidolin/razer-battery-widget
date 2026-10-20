@@ -554,7 +554,38 @@
     });
   }
 
-  const ICON_SPEAKER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M17.66 6.34a8 8 0 0 1 0 11.32"/></svg>`;
+  // Warning shown when Synapse reports no devices (often stuck on a pending update until opened).
+  const synapseWarning = document.getElementById('synapse-warning');
+  const synapseWarningOpen = document.getElementById('synapse-warning-open');
+  let synapseWarningDismissed = false;
+
+  function renderSynapseStatus(status) {
+    if (!synapseWarning) return;
+    const noData = !!(status && status.noData);
+    // Main only reports the first dropout of each launch; a dismissed warning stays hidden.
+    synapseWarning.hidden = !noData || synapseWarningDismissed;
+    if (synapseWarningOpen) synapseWarningOpen.hidden = !(status && status.canOpen);
+  }
+
+  if (synapseWarningOpen && window.electronAPI && typeof window.electronAPI.openSynapse === 'function') {
+    synapseWarningOpen.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.electronAPI.openSynapse();
+    });
+  }
+
+  const synapseWarningClose = document.getElementById('synapse-warning-close');
+  if (synapseWarningClose) {
+    synapseWarningClose.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      synapseWarningDismissed = true;
+      if (synapseWarning) synapseWarning.hidden = true;
+    });
+  }
+
+  const ICON_SPEAKER =`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M17.66 6.34a8 8 0 0 1 0 11.32"/></svg>`;
   const ICON_MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/><path d="M8 22h8"/></svg>`;
 
   function renderAudioLevels(data) {
@@ -778,6 +809,11 @@
           requestContextMenuAt(pt.x, pt.y);
         }
       });
+    }
+
+    if (typeof window.electronAPI.getSynapseStatus === 'function') {
+      window.electronAPI.onSynapseStatus(renderSynapseStatus);
+      window.electronAPI.getSynapseStatus().then(renderSynapseStatus).catch(() => {});
     }
 
     window.electronAPI.onDevicesUpdate(render);

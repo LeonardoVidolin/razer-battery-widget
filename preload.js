@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAudioLevelsUpdate: (cb) => {
     ipcRenderer.on('audio-levels-update', (_e, data) => cb(data));
   },
+  getSynapseStatus: () => ipcRenderer.invoke('get-synapse-status'),
+  onSynapseStatus: (cb) => {
+    ipcRenderer.on('synapse-status', (_e, status) => cb(status));
+  },
+  openSynapse: () => ipcRenderer.invoke('open-synapse'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   onSettingsUpdate: (cb) => {
     ipcRenderer.on('settings-update', (_e, settings) => cb(settings));

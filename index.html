@@ -21,6 +21,15 @@
   <div class="widget" id="widget-root">
     <button type="button" class="refresh-btn hide-btn" id="hide-btn" title="Hide widget (battery stays in the taskbar)" aria-label="Hide widget">–</button>
     <button type="button" class="refresh-btn" id="refresh-btn"title="Refresh device status" aria-label="Refresh">↻</button>
+    <div class="synapse-warning" id="synapse-warning" role="alert" hidden>
+      <span class="synapse-warning-icon" aria-hidden="true">⚠</span>
+      <div class="synapse-warning-text">
+        <strong>No data from Razer Synapse</strong>
+        <span>It may be waiting for an update. Open it so it can finish.</span>
+      </div>
+      <button type="button" class="synapse-warning-open" id="synapse-warning-open">Open Synapse</button>
+      <button type="button" class="synapse-warning-close" id="synapse-warning-close" title="Dismiss" aria-label="Dismiss">×</button>
+    </div>
     <div class="devices" id="devices"></div>
     <div class="volume-split" role="separator">
       <span class="volume-split-line" aria-hidden="true"></span>
