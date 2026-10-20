@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 const { RazerWatcher } = require('./watcher/razer_watcher');
 const { readWindowsAudioLevels, setWindowsAudioLevels, shutdownAudioWorker } = require('./lib/read_windows_audio');
 
@@ -238,14 +239,94 @@ function showWidgetWithoutStealingFocus() {
 
 function pushDevicesToRenderer() {
   if (isQuitting || !razerWatcher) return;
+  updateSynapseStatus();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
     const wc = mainWindow.webContents;
     if (wc.isDestroyed()) return;
     wc.send('devices-update', razerWatcher.listDevices());
+    wc.send('synapse-status', getSynapseStatus());
   } catch (e) {
     console.warn('pushDevicesToRenderer:', e.message);
   }
+}
+
+/**
+ * Synapse sometimes starts stuck on a pending self-update ("Downloading..." in its window) and
+ * reports no devices until it is opened by hand. Its logs carry no reliable marker for that, so
+ * the symptom is used instead: still no devices once the startup re-reads (up to 30s) are done.
+ */
+const SYNAPSE_NO_DATA_GRACE_MS = 45 * 1000;
+const SYNAPSE_LAUNCHER_PATH = path.join(
+  process.env.ProgramFiles || 'C:\\Program Files',
+  'Razer',
+  'RazerAppEngine',
+  'RazerAppEngine.exe'
+);
+let watcherStartedAt = 0;
+let synapseNoData = false;
+let synapseNotification = null;
+/** The warning (banner + toast) is shown at most once per launch, so a flaky Synapse can't spam it. */
+let synapseWarnedThisLaunch = false;
+let synapseWarningActive = false;
+
+function getSynapseStatus() {
+  return { noData: synapseWarningActive, canOpen: fs.existsSync(SYNAPSE_LAUNCHER_PATH) };
+}
+
+function updateSynapseStatus() {
+  if (isQuitting || !razerWatcher || !watcherStartedAt) return;
+  const noData =
+    razerWatcher.listDevices().length === 0 && Date.now() - watcherStartedAt >= SYNAPSE_NO_DATA_GRACE_MS;
+  if (noData === synapseNoData) return;
+  synapseNoData = noData;
+  if (noData && !synapseWarnedThisLaunch) {
+    synapseWarnedThisLaunch = true;
+    synapseWarningActive = true;
+    showSynapseNoDataNotification();
+  } else if (!noData) {
+    // Once data is back the warning is over for this launch; a later dropout only shows in the tray tooltip.
+    synapseWarningActive = false;
+    if (synapseNotification) {
+      synapseNotification.close();
+      synapseNotification = null;
+    }
+  }
+  if (tray) {
+    tray.setToolTip(noData ? 'Razer Battery Widget — no data from Synapse (open Synapse)' : 'Razer Battery Widget');
+  }
+}
+
+/** Windows toast, so the problem is noticed even with the widget hidden; clicking it opens Synapse. */
+function showSynapseNoDataNotification() {
+  if (!Notification.isSupported()) return;
+  try {
+    synapseNotification = new Notification({
+      title: 'Razer Synapse is not reporting batteries',
+      body: 'It may be waiting for an update. Click to open Synapse so it can finish.',
+      silent: true,
+    });
+    synapseNotification.on('click', () => openSynapse());
+    synapseNotification.show();
+  } catch (e) {
+    console.warn('showSynapseNoDataNotification:', e.message);
+  }
+}
+
+/** Same command as Synapse's own Start Menu shortcut. */
+function openSynapse() {
+  if (!fs.existsSync(SYNAPSE_LAUNCHER_PATH)) return false;
+  try {
+    const child = spawn(SYNAPSE_LAUNCHER_PATH, ['--url-params=apps=synapse'], { detached: true, stdio: 'ignore' });
+    child.on('error', (e) => console.warn('openSynapse:', e.message));
+    child.unref();
+  } catch (e) {
+    console.warn('openSynapse:', e.message);
+    return false;
+  }
+  // Re-read soon after so the warning clears once Synapse (and its update) is up.
+  [5000, 15000, 30000].forEach((ms) => setTimeout(tickDevicesFromMain, ms));
+  return true;
 }
 
 let audioLevelsInFlight = false;
@@ -588,9 +669,13 @@ app.whenReady().then(() => {
   screen.on('display-removed', ensureMainWindowOnScreen);
   screen.on('display-metrics-changed', ensureMainWindowOnScreen);
 
+  if (process.platform === 'win32') app.setAppUserModelId('com.razer.batterywidget');
+
   razerWatcher = new RazerWatcher(() => pushDevicesToRenderer());
   razerWatcher.initialize();
   razerWatcher.start();
+  watcherStartedAt = Date.now();
+  setTimeout(pushDevicesToRenderer, SYNAPSE_NO_DATA_GRACE_MS + 500);
   // Extra reads at startup so headsets appear sooner (Synapse often logs them late)
   [400, 1500, 3000, 8000, 15000, 30000].forEach((ms) => {
     setTimeout(async () => {
@@ -677,6 +762,8 @@ ipcMain.handle('refresh-devices', async () => {
   }
   return [];
 });
+ipcMain.handle('get-synapse-status', () => getSynapseStatus());
+ipcMain.handle('open-synapse', () => openSynapse());
 ipcMain.handle('get-settings', () => loadSettings());
 ipcMain.handle('set-open-at-login', (_, value) => {
   const settings = loadSettings();
