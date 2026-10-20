@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.0] — 2026-10-20
+
+### Added
+
+- **Warning when Synapse sends no data** — Synapse sometimes starts stuck on a pending self-update and reports no batteries until it is opened by hand. If no devices show up 45 s after launch, the widget now shows a banner with an **Open Synapse** button, a Windows notification (click to open Synapse) and a tray tooltip. The banner and notification appear at most once per launch, so a flaky Synapse can't spam warnings.
+
+### Build
+
+- NSIS installer: `npm run dist` → `dist/Razer Battery Widget Setup 1.7.0.exe`.
+
 ## [1.6.1] — 2026-10-16
 
 ### Fixed
